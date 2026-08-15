@@ -292,7 +292,9 @@ async function openChat(user,element){
 
   const chatId=getChatId(user);
   const chatRef=doc(db,"chats",chatId);
-  const participants=user.isGroup ? user.participants : [currentUser.uid,user.id];
+  const participants=user.isGroup
+    ? [...new Set(user.participants || [])]
+    : [currentUser.uid,user.id].sort();
 
   try{
     // For direct chats this uses a fresh dm_v2_ namespace, avoiding
