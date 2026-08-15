@@ -288,31 +288,36 @@ async function openChat(user,element){
   const participants=user.isGroup ? user.participants : [currentUser.uid,user.id];
 
   try{
-    const chatSnap=await getDoc(chatRef);
-    if(!chatSnap.exists()){
-      await setDoc(chatRef,{
-        chatId,
-        type:user.isGroup?"group":"direct",
-        name:user.isGroup?user.name:null,
-        participants,
-        createdBy:currentUser.uid,
-        createdAt:serverTimestamp(),
-        typing:{}
-      });
-    }else{
-      const data=chatSnap.data()||{};
-      if(!Array.isArray(data.participants)||!data.participants.includes(currentUser.uid)){
-        throw new Error("You are not a participant in this chat.");
-      }
-    }
+    // Create the chat if it does not exist. This avoids a permission
+    // failure from reading a non-existent chat before creating it.
+    await setDoc(chatRef,{
+      chatId,
+      type:user.isGroup?"group":"direct",
+      name:user.isGroup?user.name:null,
+      participants,
+      createdBy:user.isGroup ? (user.createdBy || currentUser.uid) : currentUser.uid,
+      createdAt:serverTimestamp(),
+      typing:{}
+    },{merge:true});
 
     const finalSnap=await getDoc(chatRef);
-    selectedChat={id:chatId,...finalSnap.data()};
+    if(!finalSnap.exists()){
+      throw new Error("Chat document could not be created.");
+    }
+
+    const data=finalSnap.data()||{};
+    if(!Array.isArray(data.participants)||!data.participants.includes(currentUser.uid)){
+      throw new Error("You are not a participant in this chat.");
+    }
+
+    selectedChat={id:chatId,...data};
+    messageInput.disabled=false;
+    sendBtn.disabled=false;
     listenMessages(chatId);
     listenTyping(chatId);
   }catch(e){
     console.error("Open chat error:",e);
-    toastMsg("Chat open failed: "+e.message);
+    toastMsg("Chat open failed: "+(e?.message||"Unknown Firebase error"));
     messageInput.disabled=true;
     sendBtn.disabled=true;
   }
