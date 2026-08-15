@@ -1,0 +1,32 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function chatParticipant(chatId) {
+      return signedIn()
+        && request.auth.uid in firestore.get(
+          /databases/(default)/documents/chats/$(chatId)
+        ).data.participants;
+    }
+
+    match /profiles/{userId}/{fileName} {
+      allow read: if signedIn();
+      allow write: if signedIn() && request.auth.uid == userId;
+    }
+
+    match /chatFiles/{chatId}/{userId}/{fileName} {
+      allow read: if chatParticipant(chatId);
+      allow write: if signedIn() && request.auth.uid == userId && chatParticipant(chatId);
+    }
+
+    match /voice/{chatId}/{userId}/{fileName} {
+      allow read: if chatParticipant(chatId);
+      allow write: if signedIn() && request.auth.uid == userId && chatParticipant(chatId);
+    }
+  }
+}
