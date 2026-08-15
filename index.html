@@ -205,14 +205,25 @@ switchText.onclick=()=>{
 
 authBtn.onclick=async()=>{
   authError.textContent="";
+  const mail=email.value.trim();
+  const pass=password.value;
+  if(!mail){authError.textContent="Enter your email address.";return}
+  if(!pass){authError.textContent="Enter your password.";return}
+  authBtn.disabled=true;
   try{
     if(isRegister){
       const name=registerName.value.trim(); if(!name) throw new Error("Enter your name.");
-      const credential=await createUserWithEmailAndPassword(auth,email.value.trim(),password.value);
-      await setDoc(doc(db,"users",credential.user.uid),{
-        uid:credential.user.uid,name,email:email.value.trim(),online:true,lastSeen:serverTimestamp(),createdAt:serverTimestamp()
-      });
-    }else await signInWithEmailAndPassword(auth,email.value.trim(),password.value);
+      const credential=await createUserWithEmailAndPassword(auth,mail,pass);
+      try{
+        await setDoc(doc(db,"users",credential.user.uid),{
+          uid:credential.user.uid,name,email:mail,online:true,lastSeen:serverTimestamp(),createdAt:serverTimestamp()
+        });
+      }catch(profileError){
+        console.warn("Profile creation skipped:",profileError);
+      }
+    }else{
+      await signInWithEmailAndPassword(auth,mail,pass);
+    }
   }catch(e){
     console.error("AUTH ERROR:",e);
     const code=e?.code||"";
@@ -229,6 +240,8 @@ authBtn.onclick=async()=>{
       "auth/too-many-requests":"Too many attempts. Try again later."
     };
     authError.textContent=messages[code] || (e?.message||"Login failed. Please try again.");
+  }finally{
+    authBtn.disabled=false;
   }
 };
 
@@ -255,8 +268,16 @@ onAuthStateChanged(auth,async user=>{
     try{ initNotifications(); }catch(e){ console.warn("Notifications skipped:",e); }
   }else{
     currentUser=null;
+    if(unsubscribeMessages)unsubscribeMessages();
+    if(unsubscribeTyping)unsubscribeTyping();
+    unsubscribeMessages=null;
+    unsubscribeTyping=null;
+    selectedUser=null;
+    selectedChat=null;
     app.classList.remove("show");
     authScreen.style.display="flex";
+    messageInput.disabled=true;
+    sendBtn.disabled=true;
   }
 });
 
@@ -285,7 +306,7 @@ function listenUsers(){
     const groups=allUsers.filter(x=>x.isGroup);
     allUsers=[...people,...groups];
     renderUsers(allUsers);
-  });
+  },e=>console.warn("Users listener:",e.message));
 }
 function renderUsers(users){
   usersList.innerHTML="";
