@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="theme-color" content="#070b14">
+<title>ShaanChat Pro</title>
+<style>
+:root{--bg:#070b14;--panel:#0b111d;--panel2:#101827;--line:rgba(255,255,255,.09);--text:#f6f8ff;--muted:#8490a5;--cyan:#00eaff;--purple:#7c3cff;--green:#48e6a1;--danger:#ff667d;--bubble:#151d2c;--mine:linear-gradient(135deg,#006f83,#7137c9)}
+*{box-sizing:border-box;margin:0;padding:0;font-family:Inter,Arial,sans-serif}
+body{min-height:100vh;background:radial-gradient(circle at 20% 20%,rgba(0,255,255,.12),transparent 30%),radial-gradient(circle at 80% 80%,rgba(120,0,255,.15),transparent 30%),var(--bg);color:var(--text)}
+button,input,textarea,select{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:pointer}
+.auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.auth-box{width:100%;max-width:430px;padding:35px;border:1px solid var(--line);border-radius:24px;background:rgba(255,255,255,.06);backdrop-filter:blur(20px);box-shadow:0 30px 80px rgba(0,0,0,.4)}
+.logo{text-align:center;font-size:32px;font-weight:900;margin-bottom:8px}.logo span,.brand span{color:var(--cyan)}.subtitle{text-align:center;color:#9da8bb;margin-bottom:28px}
+.input,.search,.message-input,.textarea,.select{width:100%;padding:13px 15px;margin-bottom:12px;border-radius:12px;border:1px solid var(--line);outline:none;background:rgba(0,0,0,.25);color:#fff}.textarea{min-height:90px;resize:vertical}.input:focus,.search:focus,.message-input:focus,.textarea:focus,.select:focus{border-color:var(--cyan)}
+.auth-main-btn{width:100%;padding:14px;border-radius:12px;background:linear-gradient(135deg,var(--cyan),var(--purple));color:#fff;font-weight:800}.switch{text-align:center;margin-top:18px;color:#9da8bb}.switch span{color:var(--cyan);cursor:pointer}.error{color:#ff6b81;text-align:center;margin-top:15px;font-size:13px;min-height:18px}
+.app{display:none;height:100vh;min-height:600px}.app.show{display:flex}.sidebar{width:350px;border-right:1px solid var(--line);background:rgba(7,11,20,.94);display:flex;flex-direction:column;flex-shrink:0}.sidebar-top{padding:18px;border-bottom:1px solid var(--line)}.brand{font-size:25px;font-weight:900}
+.me{display:flex;align-items:center;gap:12px;margin-top:18px}.avatar{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--cyan),var(--purple));font-weight:900;overflow:hidden;flex-shrink:0}.avatar img,.user-avatar img,.chat-avatar img{width:100%;height:100%;object-fit:cover}.me-info{min-width:0}.me-info strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.me-info small{color:var(--green)}.logout{margin-left:auto;background:transparent;color:var(--danger);cursor:pointer;border:0}
+.profile-actions{display:flex;gap:7px;margin-top:12px;flex-wrap:wrap}.small-btn{padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:#111927;color:#bfc8d9;cursor:pointer;font-size:12px}.small-btn:hover{border-color:var(--cyan);color:#fff}
+.search{margin-top:16px;margin-bottom:0}.users{overflow:auto;flex:1}.section-label{padding:12px 18px;color:#68758c;font-size:11px;text-transform:uppercase;letter-spacing:.12em}
+.user{padding:12px 14px 12px 18px;display:flex;align-items:center;gap:11px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04)}.user:hover,.user.active{background:rgba(0,234,255,.08)}.user-avatar,.chat-avatar{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#172033;color:var(--cyan);font-weight:800;overflow:hidden;flex-shrink:0;position:relative}.user-info{min-width:0;flex:1}.user-name{font-weight:700}.user-email{color:#8490a5;font-size:11px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.presence-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#5d687b;margin-right:5px}.presence-dot.online{background:#2ce68d;box-shadow:0 0 8px #2ce68d}
+.group-actions{margin-left:auto;display:flex;gap:4px}.group-actions button{border:0;background:#111a29;color:#aebbd0;border-radius:7px;padding:5px 7px;cursor:pointer}.group-actions button:hover{background:#1f2b40;color:#fff}.unread{min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:var(--cyan);color:#001218;font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center}
+.chat{flex:1;display:flex;flex-direction:column;min-width:0}.chat-header{min-height:75px;padding:12px 18px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line);background:rgba(7,11,20,.76)}.chat-head-info{min-width:0}.chat-title{font-weight:800}.chat-status{font-size:12px;color:var(--green);margin-top:3px}.chat-tools{margin-left:auto;display:flex;gap:7px}.icon-btn{width:38px;height:38px;border:1px solid var(--line);border-radius:10px;background:#111927;color:#d7deeb;cursor:pointer}.mobile-back{display:none;border:0;background:transparent;color:var(--cyan);font-size:21px}
+.messages{flex:1;padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:10px}.empty{margin:auto;text-align:center;color:#778298}.message-wrap{max-width:78%;display:flex;flex-direction:column;position:relative}.message-wrap.sent{align-self:flex-end;align-items:flex-end}.message-wrap.received{align-self:flex-start;align-items:flex-start}.message{padding:10px 13px;border-radius:16px;line-height:1.4;word-break:break-word;background:var(--bubble);position:relative;white-space:pre-wrap}.sent .message{background:var(--mine);border-bottom-right-radius:4px}.received .message{border-bottom-left-radius:4px}.message img.media{max-width:280px;max-height:300px;border-radius:12px;display:block}.file-card{display:flex;align-items:center;gap:9px;min-width:200px}.file-card a{color:#fff;text-decoration:none;font-weight:700}.message-time{display:block;font-size:10px;opacity:.65;margin-top:5px;text-align:right}.ticks{font-size:11px;margin-left:4px}.ticks.seen{color:#69efff}.reply-preview{border-left:3px solid var(--cyan);padding:6px 8px;margin-bottom:7px;background:rgba(0,0,0,.16);border-radius:7px;font-size:11px;opacity:.85}.message-actions{display:flex;gap:3px;position:absolute;top:-36px;background:#111927;border:1px solid var(--line);padding:4px;border-radius:9px;z-index:3;opacity:0;pointer-events:none;transition:.15s}.message-wrap:hover .message-actions,.message-wrap.selected .message-actions{opacity:1;pointer-events:auto}.message-actions button{border:0;background:transparent;color:#cbd4e3;cursor:pointer;padding:5px 6px;border-radius:7px;font-size:12px}.message-actions button:hover{background:#1b2638;color:#fff}.reaction-row{display:flex;gap:4px;margin-top:4px}.reaction{background:#111927;border:1px solid var(--line);border-radius:12px;padding:2px 6px;font-size:11px;cursor:pointer}.pinned{box-shadow:0 0 0 1px rgba(0,234,255,.45)}.starred{border-left:2px solid #ffd166}.deleted{font-style:italic;opacity:.55}.forward-label{font-size:10px;color:#9ca9bd;margin-bottom:4px}.typing{height:22px;padding:0 20px;color:#65dff0;font-size:12px;font-style:italic}
+.composer{padding:10px 14px;display:flex;gap:8px;border-top:1px solid var(--line);background:rgba(7,11,20,.88);align-items:center}.message-input{margin:0;flex:1}.send{width:50px;height:48px;border:0;border-radius:13px;background:var(--cyan);color:#001218;font-size:20px;cursor:pointer}.send:disabled{opacity:.35}.attach{width:42px;height:42px;border:0;background:transparent;color:#aab6c9;font-size:22px;cursor:pointer}.recording{color:#ff667d!important}.reply-bar{position:absolute;left:0;right:0;bottom:70px;padding:9px 14px;background:#111927;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px}.reply-bar .close{margin-left:auto;background:transparent;border:0;color:#ff667d;cursor:pointer}
+.app{position:relative}.toast{position:fixed;right:18px;bottom:18px;background:#111927;border:1px solid var(--line);padding:11px 14px;border-radius:10px;z-index:100;color:#fff;box-shadow:0 12px 35px rgba(0,0,0,.35)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:90;padding:20px}.modal-card{width:100%;max-width:520px;background:#0d1421;border:1px solid var(--line);border-radius:18px;padding:22px;max-height:90vh;overflow:auto}.modal-title{font-size:20px;font-weight:800;margin-bottom:15px}.modal-row{display:flex;gap:10px}.modal-row>*{flex:1}.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.check-list{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:10px}.check-item{padding:11px;display:flex;gap:10px;align-items:center;border-bottom:1px solid var(--line)}.check-item:last-child{border-bottom:0}.danger{color:#ff7b8d!important}.info-box{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.03);font-size:12px;color:#aeb9cb;margin-bottom:12px}.invite{word-break:break-all;padding:10px;background:#070b14;border-radius:9px;color:var(--cyan);font-size:12px}
+.theme-light{--bg:#edf2f8;--panel:#fff;--panel2:#f3f6fb;--line:rgba(15,25,45,.12);--text:#142033;--muted:#607089;--bubble:#e6ebf3}.theme-light body{background:#edf2f8}.theme-light .sidebar,.theme-light .chat-header,.theme-light .composer{background:rgba(255,255,255,.9)}.theme-light .input,.theme-light .search,.theme-light .message-input,.theme-light .small-btn,.theme-light .icon-btn,.theme-light .textarea,.theme-light .select{background:#fff;color:#142033}.theme-light .message.received{background:#e3e9f2}.theme-light .file-card a{color:#142033}.theme-light .message-actions{background:#fff}
+@media(max-width:800px){.sidebar{width:100%}.chat{display:none}.app.chat-open .sidebar{display:none}.app.chat-open .chat{display:flex}.mobile-back{display:block}.message-wrap{max-width:88%}.chat-tools{display:none}}
+</style>
+</head>
+<body>
+
+<section class="auth-screen" id="authScreen">
+  <div class="auth-box">
+    <div class="logo">shaan<span>Chat</span></div>
+    <div class="subtitle">Private real-time messaging</div>
+    <div id="registerFields" class="hidden"><input class="input" id="registerName" placeholder="Your name" maxlength="40"></div>
+    <input class="input" id="email" type="email" placeholder="Email address">
+    <input class="input" id="password" type="password" placeholder="Password">
+    <button class="btn auth-main-btn" id="authBtn">Login</button>
+    <div class="switch"><span id="switchText">Create a new account</span></div>
+    <p class="error" id="authError"></p>
+  </div>
+</section>
+
+<section class="app" id="app">
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <div class="brand">shaan<span>Chat</span></div>
+      <div class="me">
+        <div class="avatar" id="myAvatar">U</div>
+        <div class="me-info"><strong id="myName">User</strong><small id="myPresence">● Online</small></div>
+        <button class="logout" id="logoutBtn">Logout</button>
+      </div>
+      <div class="profile-actions">
+        <button class="small-btn" id="profileBtn">👤 Profile</button>
+        <button class="small-btn" id="groupBtn">👥 New group</button>
+        <button class="small-btn" id="themeBtn">🌙 Theme</button>
+        <button class="small-btn" id="notifyBtn">🔔 Notify</button>
+      </div>
+      <input class="search" id="searchUsers" placeholder="Search users...">
+    </div>
+    <div class="users" id="usersList"></div>
+  </aside>
+
+  <main class="chat">
+    <header class="chat-header">
+      <button class="mobile-back" id="backBtn">←</button>
+      <div class="chat-avatar" id="chatAvatar">?</div>
+      <div class="chat-head-info">
+        <div class="chat-title" id="chatName">Select a user</div>
+        <div class="chat-status" id="chatStatus">Start a conversation</div>
+      </div>
+      <div class="chat-tools">
+        <button class="icon-btn" id="muteBtn" title="Mute">🔔</button>
+        <button class="icon-btn" id="pinChatBtn" title="Pin chat">📌</button>
+        <button class="icon-btn" id="chatMenuBtn" title="Chat settings">⋮</button>
+        <button class="icon-btn" id="searchMessagesBtn" title="Search messages">🔎</button>
+      </div>
+    </header>
+    <div class="messages" id="messages"><div class="empty">Select a user to start chatting 💬</div></div>
+    <div class="typing" id="typingIndicator"></div>
+    <div class="reply-bar hidden" id="replyBar"><div id="replyText"></div><button class="close" id="cancelReply">✕</button></div>
+    <div class="composer">
+      <input type="file" id="fileInput" hidden multiple accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.zip">
+      <button class="attach" id="attachBtn" title="Image/file">📎</button>
+      <button class="attach" id="recordBtn" title="Voice message">🎤</button>
+      <input class="message-input" id="messageInput" placeholder="Type a message..." disabled>
+      <button class="send" id="sendBtn" disabled>➤</button>
+    </div>
+  </main>
+</section>
+
+<div class="modal hidden" id="profileModal"><div class="modal-card">
+  <div class="modal-title">Profile</div>
+  <input class="input" id="profileName" placeholder="Name" maxlength="40">
+  <input class="input" id="profileAbout" placeholder="About / status" maxlength="100">
+  <input type="file" class="input" id="profilePhoto" accept="image/*">
+  <select class="select" id="onlinePrivacy"><option value="everyone">Online: Everyone</option><option value="nobody">Online: Nobody</option></select>
+  <select class="select" id="lastSeenPrivacy"><option value="everyone">Last seen: Everyone</option><option value="nobody">Last seen: Nobody</option></select>
+  <div class="modal-actions"><button class="small-btn" data-close="profileModal">Cancel</button><button class="small-btn" id="saveProfile">Save</button></div>
+</div></div>
+
+<div class="modal hidden" id="groupModal"><div class="modal-card">
+  <div class="modal-title">Create group</div>
+  <input class="input" id="groupName" placeholder="Group name" maxlength="50">
+  <input class="input" id="groupDescription" placeholder="Group description" maxlength="150">
+  <input type="file" class="input" id="groupPhoto" accept="image/*">
+  <div class="check-list" id="groupUsers"></div>
+  <div class="modal-actions"><button class="small-btn" data-close="groupModal">Cancel</button><button class="small-btn" id="createGroup">Create</button></div>
+</div></div>
+
+<div class="modal hidden" id="groupManageModal"><div class="modal-card">
+  <div class="modal-title">Group settings</div>
+  <input class="input" id="manageGroupName" maxlength="50" placeholder="Group name">
+  <textarea class="textarea" id="manageGroupDescription" maxlength="150" placeholder="Description"></textarea>
+  <input type="file" class="input" id="manageGroupPhoto" accept="image/*">
+  <div class="info-box" id="groupAdminInfo"></div>
+  <div class="check-list" id="manageMembers"></div>
+  <div class="modal-actions"><button class="small-btn" id="groupInviteBtn">🔗 Invite link</button><button class="small-btn danger" id="leaveGroupBtn">Leave</button><button class="small-btn" data-close="groupManageModal">Close</button><button class="small-btn" id="saveGroup">Save</button></div>
+</div></div>
+
+<div class="modal hidden" id="inviteModal"><div class="modal-card">
+  <div class="modal-title">Group invite link</div><div class="invite" id="inviteLink"></div>
+  <div class="modal-actions"><button class="small-btn" id="copyInvite">Copy</button><button class="small-btn" data-close="inviteModal">Close</button></div>
+</div></div>
+
+<div class="modal hidden" id="searchModal"><div class="modal-card">
+  <div class="modal-title">Search messages</div><input class="input" id="messageSearchInput" placeholder="Search loaded messages...">
+  <div id="messageSearchResults" style="max-height:320px;overflow:auto;color:#aeb9cb"></div>
+  <div class="modal-actions"><button class="small-btn" data-close="searchModal">Close</button></div>
+</div></div>
+
+<div class="modal hidden" id="chatMenuModal"><div class="modal-card">
+  <div class="modal-title">Chat options</div>
+  <button class="small-btn" style="width:100%;margin-bottom:8px" id="blockUserBtn">🚫 Block / Unblock</button>
+  <button class="small-btn" style="width:100%;margin-bottom:8px" id="reportUserBtn">⚠️ Report user</button>
+  <button class="small-btn" style="width:100%;margin-bottom:8px" id="clearChatBtn">🧹 Clear chat for me</button>
+  <div class="modal-actions"><button class="small-btn" data-close="chatMenuModal">Close</button></div>
+</div></div>
+
+<div class="toast hidden" id="toast"></div>
+
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+import {getAuth,createUserWithEmailAndPassword,signInWithEmailAndPassword,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+import {getFirestore,collection,addDoc,setDoc,updateDoc,deleteDoc,doc,getDoc,getDocs,query,orderBy,onSnapshot,serverTimestamp,arrayUnion,arrayRemove,where,limit} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+import {getStorage,ref,uploadBytes,getDownloadURL} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-storage.js";
+import {getMessaging,getToken,onMessage,isSupported} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-messaging.js";
+import {initializeAppCheck,ReCaptchaV3Provider} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app-check.js";
+
+const firebaseConfig={apiKey:"AIzaSyAsJnrF8MehSSvMuNHvBG31OFfKWdXf9mU",authDomain:"shaan1731.firebaseapp.com",projectId:"shaan1731",storageBucket:"shaan1731.firebasestorage.app",messagingSenderId:"605552600836",appId:"1:605552600836:web:b9ac71747648a6c2f6d251"};
+const APP_CHECK_SITE_KEY="";
+const VAPID_KEY="";
+
+const firebaseApp=initializeApp(firebaseConfig);
+if(APP_CHECK_SITE_KEY){try{initializeAppCheck(firebaseApp,{provider:new ReCaptchaV3Provider(APP_CHECK_SITE_KEY),isTokenAutoRefreshEnabled:true})}catch(e){console.warn(e)}}
+const auth=getAuth(firebaseApp),db=getFirestore(firebaseApp),storage=getStorage(firebaseApp);
+const $=id=>document.getElementById(id);
+const authScreen=$("authScreen"),app=$("app"),registerFields=$("registerFields"),registerName=$("registerName"),email=$("email"),password=$("password"),authBtn=$("authBtn"),switchText=$("switchText"),authError=$("authError");
+const usersList=$("usersList"),messages=$("messages"),messageInput=$("messageInput"),sendBtn=$("sendBtn"),myName=$("myName"),myAvatar=$("myAvatar"),myPresence=$("myPresence"),chatName=$("chatName"),chatAvatar=$("chatAvatar"),chatStatus=$("chatStatus"),logoutBtn=$("logoutBtn"),searchUsers=$("searchUsers"),backBtn=$("backBtn"),typingIndicator=$("typingIndicator"),replyBar=$("replyBar"),replyText=$("replyText"),cancelReply=$("cancelReply"),fileInput=$("fileInput"),attachBtn=$("attachBtn"),recordBtn=$("recordBtn"),toast=$("toast"),profileModal=$("profileModal"),groupModal=$("groupModal"),searchModal=$("searchModal");
+let isRegister=false,currentUser=null,selectedUser=null,selectedChat=null,unsubscribeMessages=null,unsubscribeTyping=null,unsubscribeUsers=null,allUsers=[],loadedMessages=[],replyingTo=null,typingTimer=null,mediaRecorder=null,voiceChunks=[],isRecording=false,messaging=null,notificationToken=null,editingMessage=null,selectedIds=new Set();
+
+switchText.onclick=()=>{isRegister=!isRegister;registerFields.classList.toggle("hidden",!isRegister);authBtn.textContent=isRegister?"Create Account":"Login";switchText.textContent=isRegister?"Already have an account? Login":"Create a new account";authError.textContent=""};
+authBtn.onclick=async()=>{authError.textContent="";try{if(isRegister){const name=registerName.value.trim();if(!name)throw Error("Enter your name.");const c=await createUserWithEmailAndPassword(auth,email.value.trim(),password.value);await setDoc(doc(db,"users",c.user.uid),{uid:c.user.uid,name,email:email.value.trim(),about:"",online:true,lastSeen:serverTimestamp(),createdAt:serverTimestamp(),privacy:{online:"everyone",lastSeen:"everyone"}})}else await signInWithEmailAndPassword(auth,email.value.trim(),password.value)}catch(e){authError.textContent=e.message}};
+
+onAuthStateChanged(auth,async user=>{if(user){currentUser=user;authScreen.style.display="none";app.classList.add("show");await ensureUserProfile();await setPresence(true);await loadMyProfile();listenUsers();initNotifications()}else{currentUser=null;app.classList.remove("show");authScreen.style.display="flex";if(unsubscribeUsers)unsubscribeUsers()}});
+async function ensureUserProfile(){const r=doc(db,"users",currentUser.uid),s=await getDoc(r);if(!s.exists())await setDoc(r,{uid:currentUser.uid,name:currentUser.email?.split("@")[0]||"User",email:currentUser.email||"",about:"",online:true,lastSeen:serverTimestamp(),createdAt:serverTimestamp(),privacy:{online:"everyone",lastSeen:"everyone"}})}
+async function loadMyProfile(){const s=await getDoc(doc(db,"users",currentUser.uid));if(!s.exists())return;const d=s.data();myName.textContent=d.name||"User";renderAvatar(myAvatar,d.photoURL,d.name)}
+async function setPresence(online){if(!currentUser)return;try{await updateDoc(doc(db,"users",currentUser.uid),{online,lastSeen:serverTimestamp()})}catch{}myPresence.textContent=online?"● Online":"● Offline"}
+setInterval(()=>{if(currentUser&&!document.hidden)setPresence(true)},30000);document.addEventListener("visibilitychange",()=>{if(currentUser)setPresence(!document.hidden)});
+window.addEventListener("beforeunload",()=>{if(currentUser)updateDoc(doc(db,"users",currentUser.uid),{online:false,lastSeen:serverTimestamp()}).catch(()=>{})});
+
+function listenUsers(){if(unsubscribeUsers)unsubscribeUsers();unsubscribeUsers=onSnapshot(collection(db,"users"),async snap=>{const people=[];snap.forEach(x=>{if(x.id!==currentUser.uid)people.push({id:x.id,...x.data(),isGroup:false})});const groups=await loadGroupsForUser();allUsers=[...people,...groups];renderUsers(filterUsers())})}
+async function loadGroupsForUser(){const out=[];const snap=await getDocs(query(collection(db,"groups")));snap.forEach(x=>{const d=x.data();if((d.members||[]).includes(currentUser.uid)&&!(d.deletedFor||[]).includes(currentUser.uid))out.push({id:x.id,...d,isGroup:true})});return out}
+function filterUsers(){const q=searchUsers.value.trim().toLowerCase();if(!q)return allUsers;return allUsers.filter(u=>(u.name||"").toLowerCase().includes(q)||(u.email||"").toLowerCase().includes(q))}
+searchUsers.oninput=()=>renderUsers(filterUsers());
+
+function renderUsers(users){usersList.innerHTML="";const groups=users.filter(u=>u.isGroup),people=users.filter(u=>!u.isGroup);if(groups.length){addLabel("Groups");groups.forEach(renderUser)}addLabel("People");if(!people.length){const e=document.createElement("div");e.style.cssText="padding:25px;color:#7d8799;text-align:center";e.textContent="No other users yet.";usersList.appendChild(e)}people.forEach(renderUser)}
+function addLabel(t){const l=document.createElement("div");l.className="section-label";l.textContent=t;usersList.appendChild(l)}
+function renderUser(user){const div=document.createElement("div");div.className="user"+(selectedUser?.id===user.id?" active":"");const online=user.isGroup?true:!!user.online;div.innerHTML=`<div class="user-avatar"></div><div class="user-info"><div class="user-name">${esc(user.name||"User")}</div><div class="user-email"><span class="presence-dot ${online?"online":""}"></span>${user.isGroup?"Group":(online?"Online":lastSeen(user.lastSeen))}</div></div>`;renderAvatar(div.querySelector(".user-avatar"),user.photoURL,user.name);
+if(user.isGroup){const actions=document.createElement("div");actions.className="group-actions";const archive=document.createElement("button");archive.title="Archive";archive.textContent="📦";archive.onclick=e=>{e.stopPropagation();archiveGroup(user.id)};const del=document.createElement("button");del.title="Delete for me";del.textContent="🗑";del.onclick=e=>{e.stopPropagation();deleteGroupForMe(user.id)};actions.append(archive,del);div.appendChild(actions)}
+div.onclick=()=>openChat(user);usersList.appendChild(div)}
+async function archiveGroup(id){try{await updateDoc(doc(db,"groups",id),{archivedBy:arrayUnion(currentUser.uid)});toastMsg("Group archived")}catch(e){toastMsg(e.message)}}
+async function deleteGroupForMe(id){if(!confirm("Delete this group from your list?"))return;try{await updateDoc(doc(db,"groups",id),{deletedFor:arrayUnion(currentUser.uid)});if(selectedUser?.id===id)resetChat();toastMsg("Group deleted for you")}catch(e){toastMsg(e.message)}}
+
+async function openChat(user){selectedUser=user;selectedChat=chatIdFor(user);editingMessage=null;selectedIds.clear();app.classList.add("chat-open");chatName.textContent=user.name||"User";renderAvatar(chatAvatar,user.photoURL,user.name);chatStatus.textContent=user.isGroup?`${(user.members||[]).length} members`:user.online?"Online":lastSeen(user.lastSeen);messageInput.disabled=false;sendBtn.disabled=false;messages.innerHTML='<div class="empty">Loading messages…</div>';if(unsubscribeMessages)unsubscribeMessages();unsubscribeMessages=onSnapshot(query(collection(db,"chats",selectedChat,"messages"),orderBy("createdAt","asc"),limit(500)),snap=>{loadedMessages=[];snap.forEach(x=>loadedMessages.push({id:x.id,...x.data()}));renderMessages();markRead()});markChatRead()}
+function chatIdFor(u){if(u.isGroup)return"group_"+u.id;return[currentUser.uid,u.id].sort().join("_")}
+function resetChat(){selectedUser=null;selectedChat=null;messageInput.disabled=true;sendBtn.disabled=true;messages.innerHTML='<div class="empty">Select a user to start chatting 💬</div>';chatName.textContent="Select a user";chatStatus.textContent="Start a conversation";chatAvatar.innerHTML="?";app.classList.remove("chat-open");if(unsubscribeMessages)unsubscribeMessages()}
+backBtn.onclick=resetChat;
+
+async function sendText(){const text=messageInput.value.trim();if(!text||!selectedUser)return;if(await isBlocked(selectedUser.id))return toastMsg("This user is blocked.");const data={senderId:currentUser.uid,senderName:myName.textContent,text,type:"text",createdAt:serverTimestamp(),seenBy:[currentUser.uid],deliveredTo:[currentUser.uid],reactions:{},starredBy:[],pinned:false};if(replyingTo)data.replyTo={id:replyingTo.id,text:replyingTo.text||"[media]",senderName:replyingTo.senderName||""};if(editingMessage){await updateDoc(doc(db,"chats",selectedChat,"messages",editingMessage.id),{text,edited:true,editedAt:serverTimestamp()});editingMessage=null}else await addDoc(collection(db,"chats",selectedChat,"messages"),data);messageInput.value="";cancelReplyFn();setTyping(false)}
+sendBtn.onclick=sendText;messageInput.onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendText()}};messageInput.oninput=()=>{setTyping(true);clearTimeout(typingTimer);typingTimer=setTimeout(()=>setTyping(false),1200)}
+async function setTyping(v){if(!selectedChat)return;const id=`${selectedChat}_${currentUser.uid}`;try{await setDoc(doc(db,"typing",id),{chatId:selectedChat,userId:currentUser.uid,name:myName.textContent,typing:v,updatedAt:serverTimestamp()},{merge:true})}catch{}}
+
+function renderMessages(){messages.innerHTML="";if(!loadedMessages.length){messages.innerHTML='<div class="empty">No messages yet. Say hello 👋</div>';return}for(const m of loadedMessages){const wrap=document.createElement("div");const mine=m.senderId===currentUser.uid;wrap.className="message-wrap "+(mine?"sent":"received")+(selectedIds.has(m.id)?" selected":"");let body="";if(m.deletedFor?.includes(currentUser.uid)){body='<div class="message deleted">Message deleted</div>'}else{if(m.forwarded)body+='<div class="forward-label">↪ Forwarded</div>';if(m.replyTo)body+=`<div class="reply-preview">↩ ${esc(m.replyTo.senderName||"Reply")}: ${esc(m.replyTo.text||"")}</div>`;if(m.type==="image")body+=`<div class="message"><img class="media" src="${escAttr(m.url)}"><span class="message-time">${time(m.createdAt)}</span></div>`;else if(m.type==="video")body+=`<div class="message"><video class="media" controls src="${escAttr(m.url)}"></video><span class="message-time">${time(m.createdAt)}</span></div>`;else if(m.type==="audio"||m.type==="voice")body+=`<div class="message"><audio controls src="${escAttr(m.url)}"></audio><span class="message-time">${time(m.createdAt)}</span></div>`;else if(m.type==="file")body+=`<div class="message file-card">📄 <a href="${escAttr(m.url)}" target="_blank" rel="noopener">${esc(m.fileName||"File")}</a><span class="message-time">${time(m.createdAt)}</span></div>`;else body+=`<div class="message ${m.starredBy?.includes(currentUser.uid)?"starred":""} ${m.pinned?"pinned":""}">${esc(m.text||"")} ${m.edited?"<small>(edited)</small>":""}<span class="message-time">${time(m.createdAt)} ${mine?`<span class="ticks ${m.seenBy?.includes(selectedUser.id)?"seen":""}">${m.seenBy?.includes(selectedUser.id)?"✓✓":"✓"}</span>`:""}</span></div>`}
+const actions=document.createElement("div");actions.className="message-actions";const acts=[["↩","Reply",()=>startReply(m)],["↗","Forward",()=>forwardMessage(m)],["📋","Copy",()=>copyText(m.text||"")],["✏️","Edit",()=>editMessage(m)],["⭐","Star",()=>toggleStar(m)],["📌","Pin",()=>togglePin(m)],["🗑","Delete",()=>deleteMessageMenu(m)],["❤️","React",()=>reactMessage(m)]];if(!mine)acts.splice(4,0,["🚩","Report",()=>reportMessage(m)]);acts.forEach(([t,title,fn])=>{const b=document.createElement("button");b.textContent=t;b.title=title;b.onclick=e=>{e.stopPropagation();fn()};actions.appendChild(b)});wrap.appendChild(actions);if(m.reactions){const rr=document.createElement("div");rr.className="reaction-row";for(const [emoji,count] of Object.entries(m.reactions)){if(count)rr.innerHTML+=`<button class="reaction" data-r="${escAttr(emoji)}">${emoji} ${count}</button>`}wrap.appendChild(rr)}wrap.onclick=e=>{if(e.ctrlKey||e.metaKey){selectedIds.has(m.id)?selectedIds.delete(m.id):selectedIds.add(m.id);renderMessages()}};messages.appendChild(wrap)}messages.scrollTop=messages.scrollHeight}
+function time(ts){if(!ts?.toDate)return"";return ts.toDate().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}
+function lastSeen(ts){return ts?.toDate?`Last seen ${ts.toDate().toLocaleString()}`:"Offline"}
+async function markRead(){if(!selectedChat||!selectedUser)return;for(const m of loadedMessages.filter(x=>x.senderId!==currentUser.uid&&!(x.seenBy||[]).includes(currentUser.uid)).slice(-100)){updateDoc(doc(db,"chats",selectedChat,"messages",m.id),{seenBy:arrayUnion(currentUser.uid),deliveredTo:arrayUnion(currentUser.uid)}).catch(()=>{})}}
+async function markChatRead(){if(!selectedChat)return;try{await setDoc(doc(db,"readState",`${currentUser.uid}_${selectedChat}`),{uid:currentUser.uid,chatId:selectedChat,readAt:serverTimestamp()},{merge:true})}catch{}}
+
+function startReply(m){replyingTo=m;replyText.textContent=`Replying to ${m.senderName||"message"}: ${m.text||"[media]"}`;replyBar.classList.remove("hidden");messageInput.focus()}
+function cancelReplyFn(){replyingTo=null;replyBar.classList.add("hidden");replyText.textContent=""}cancelReply.onclick=cancelReplyFn;
+async function forwardMessage(m){if(!selectedUser)return;const target=prompt("Enter recipient UID (or group ID):");if(!target)return;const isGroup=allUsers.find(x=>x.id===target&&x.isGroup);const chat=isGroup?"group_"+target:[currentUser.uid,target].sort().join("_");await addDoc(collection(db,"chats",chat,"messages"),{...cleanForward(m),senderId:currentUser.uid,senderName:myName.textContent,createdAt:serverTimestamp(),forwarded:true,seenBy:[currentUser.uid],deliveredTo:[currentUser.uid],reactions:{},starredBy:[]});toastMsg("Forwarded")}
+function cleanForward(m){const o={text:m.text||"",type:m.type||"text"};if(m.url)o.url=m.url;if(m.fileName)o.fileName=m.fileName;return o}
+async function editMessage(m){if(m.senderId!==currentUser.uid||m.type!=="text")return;editingMessage=m;messageInput.value=m.text||"";messageInput.focus();toastMsg("Editing message")}
+async function toggleStar(m){await updateDoc(doc(db,"chats",selectedChat,"messages",m.id),{starredBy:(m.starredBy||[]).includes(currentUser.uid)?arrayRemove(currentUser.uid):arrayUnion(currentUser.uid)})}
+async function togglePin(m){await updateDoc(doc(db,"chats",selectedChat,"messages",m.id),{pinned:!m.pinned,pinnedBy:!m.pinned?currentUser.uid:null})}
+async function deleteMessageMenu(m){const all=confirm("Delete for everyone? Press Cancel for delete for me.");if(all){await deleteDoc(doc(db,"chats",selectedChat,"messages",m.id))}else await updateDoc(doc(db,"chats",selectedChat,"messages",m.id),{deletedFor:arrayUnion(currentUser.uid)})}
+async function reactMessage(m){const e=prompt("Reaction: ❤️ 👍 😂 😮 😢 😡");if(!e)return;const reactions={...(m.reactions||{})};reactions[e]=(reactions[e]||0)+1;await updateDoc(doc(db,"chats",selectedChat,"messages",m.id),{reactions})}
+async function reportMessage(m){await addDoc(collection(db,"reports"),{type:"message",reporterId:currentUser.uid,messageId:m.id,chatId:selectedChat,reportedUserId:m.senderId,createdAt:serverTimestamp()});toastMsg("Reported")}
+async function copyText(t){try{await navigator.clipboard.writeText(t);toastMsg("Copied")}catch{}}
+
+async function deleteSelected(){if(!selectedIds.size)return;for(const id of selectedIds)await updateDoc(doc(db,"chats",selectedChat,"messages",id),{deletedFor:arrayUnion(currentUser.uid)});selectedIds.clear();renderMessages()}
+async function uploadFiles(files){for(const file of files){if(file.size>25*1024*1024){toastMsg(`${file.name}: max 25MB`);continue}const ok=/^(image|video|audio)\//.test(file.type)||["application/pdf","text/plain","application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/zip"].includes(file.type);if(!ok){toastMsg(`Unsupported: ${file.name}`);continue}const path=`chatFiles/${currentUser.uid}/${Date.now()}_${safeFile(file.name)}`;const r=ref(storage,path);await uploadBytes(r,file);const url=await getDownloadURL(r);const type=file.type.startsWith("image/")?"image":file.type.startsWith("video/")?"video":file.type.startsWith("audio/")?"audio":"file";await addDoc(collection(db,"chats",selectedChat,"messages"),{senderId:currentUser.uid,senderName:myName.textContent,type,url,fileName:file.name,size:file.size,mime:file.type,createdAt:serverTimestamp(),seenBy:[currentUser.uid],deliveredTo:[currentUser.uid],reactions:{},starredBy:[]})}}
+attachBtn.onclick=()=>fileInput.click();fileInput.onchange=()=>{if(fileInput.files?.length)uploadFiles(fileInput.files);fileInput.value=""};
+
+recordBtn.onclick=async()=>{if(isRecording){mediaRecorder.stop();return}try{const stream=await navigator.mediaDevices.getUserMedia({audio:true});voiceChunks=[];mediaRecorder=new MediaRecorder(stream);mediaRecorder.ondataavailable=e=>voiceChunks.push(e.data);mediaRecorder.onstop=async()=>{stream.getTracks().forEach(t=>t.stop());const blob=new Blob(voiceChunks,{type:"audio/webm"});const r=ref(storage,`voice/${currentUser.uid}/${Date.now()}.webm`);await uploadBytes(r,blob);const url=await getDownloadURL(r);await addDoc(collection(db,"chats",selectedChat,"messages"),{senderId:currentUser.uid,senderName:myName.textContent,type:"voice",url,createdAt:serverTimestamp(),seenBy:[currentUser.uid],deliveredTo:[currentUser.uid],reactions:{},starredBy:[]});recordBtn.classList.remove("recording");isRecording=false};mediaRecorder.start();isRecording=true;recordBtn.classList.add("recording");toastMsg("Recording… tap mic to stop")}catch(e){toastMsg("Microphone permission required")}}
+
+$("profileBtn").onclick=async()=>{const s=await getDoc(doc(db,"users",currentUser.uid));const d=s.data()||{};$("profileName").value=d.name||"";$("profileAbout").value=d.about||"";$("onlinePrivacy").value=d.privacy?.online||"everyone";$("lastSeenPrivacy").value=d.privacy?.lastSeen||"everyone";profileModal.classList.remove("hidden")};
+$("saveProfile").onclick=async()=>{let photoURL;const f=$("profilePhoto").files[0];if(f){if(f.size>5*1024*1024)return toastMsg("Profile image max 5MB");const r=ref(storage,`profiles/${currentUser.uid}/avatar`);await uploadBytes(r,f);photoURL=await getDownloadURL(r)}const data={name:$("profileName").value.trim()||"User",about:$("profileAbout").value.trim(),privacy:{online:$("onlinePrivacy").value,lastSeen:$("lastSeenPrivacy").value}};if(photoURL)data.photoURL=photoURL;await updateDoc(doc(db,"users",currentUser.uid),data);await loadMyProfile();profileModal.classList.add("hidden");toastMsg("Profile updated")};
+
+$("groupBtn").onclick=async()=>{const box=$("groupUsers");box.innerHTML="";allUsers.filter(u=>!u.isGroup).forEach(u=>{const row=document.createElement("label");row.className="check-item";row.innerHTML=`<input type="checkbox" value="${escAttr(u.id)}"><span>${esc(u.name||u.email)}</span>`;box.appendChild(row)});groupModal.classList.remove("hidden")};
+$("createGroup").onclick=async()=>{const name=$("groupName").value.trim();const members=[...document.querySelectorAll("#groupUsers input:checked")].map(x=>x.value);if(!name||!members.length)return toastMsg("Enter name and select members");members.push(currentUser.uid);const group=await addDoc(collection(db,"groups"),{name,description:$("groupDescription").value.trim(),members:[...new Set(members)],admins:[currentUser.uid],createdBy:currentUser.uid,createdAt:serverTimestamp(),archivedBy:[],deletedFor:[],mutedBy:[]});const f=$("groupPhoto").files[0];if(f){const r=ref(storage,`groups/${group.id}/photo`);await uploadBytes(r,f);const url=await getDownloadURL(r);await updateDoc(group,{photoURL:url})}groupModal.classList.add("hidden");await refreshGroups();toastMsg("Group created")};
+async function refreshGroups(){const groups=await loadGroupsForUser();allUsers=[...allUsers.filter(x=>!x.isGroup),...groups];renderUsers(filterUsers())}
+
+$("chatMenuBtn").onclick=()=>selectedUser&&$("chatMenuModal").classList.remove("hidden");
+$("blockUserBtn").onclick=async()=>{if(!selectedUser||selectedUser.isGroup)return;const r=doc(db,"users",currentUser.uid);const s=await getDoc(r);const b=s.data()?.blockedUsers||[];if(b.includes(selectedUser.id)){await updateDoc(r,{blockedUsers:arrayRemove(selectedUser.id)});toastMsg("Unblocked")}else{await updateDoc(r,{blockedUsers:arrayUnion(selectedUser.id)});toastMsg("Blocked")}$("chatMenuModal").classList.add("hidden")};
+async function isBlocked(id){const s=await getDoc(doc(db,"users",currentUser.uid));return(s.data()?.blockedUsers||[]).includes(id)}
+$("reportUserBtn").onclick=async()=>{if(!selectedUser)return;await addDoc(collection(db,"reports"),{type:"user",reporterId:currentUser.uid,reportedUserId:selectedUser.id,createdAt:serverTimestamp()});$("chatMenuModal").classList.add("hidden");toastMsg("Report submitted")};
+$("clearChatBtn").onclick=async()=>{if(!selectedChat)return;for(const m of loadedMessages)await updateDoc(doc(db,"chats",selectedChat,"messages",m.id),{deletedFor:arrayUnion(currentUser.uid)});$("chatMenuModal").classList.add("hidden");toastMsg("Chat cleared for you")};
+
+$("muteBtn").onclick=async()=>{if(!selectedUser)return;const refd=doc(db,"users",currentUser.uid);const s=await getDoc(refd);const muted=s.data()?.mutedChats||[];if(muted.includes(selectedChat)){await updateDoc(refd,{mutedChats:arrayRemove(selectedChat)});toastMsg("Unmuted")}else{await updateDoc(refd,{mutedChats:arrayUnion(selectedChat)});toastMsg("Muted")}};
+$("pinChatBtn").onclick=async()=>{if(!selectedChat)return;const refd=doc(db,"users",currentUser.uid);const s=await getDoc(refd);const pins=s.data()?.pinnedChats||[];await updateDoc(refd,{pinnedChats:pins.includes(selectedChat)?arrayRemove(selectedChat):arrayUnion(selectedChat)});toastMsg("Chat pin updated")};
+
+let manageGroupId=null;
+async function openGroupManage(){if(!selectedUser?.isGroup)return;manageGroupId=selectedUser.id;$("manageGroupName").value=selectedUser.name||"";$("manageGroupDescription").value=selectedUser.description||"";$("groupAdminInfo").textContent=`Admins: ${(selectedUser.admins||[]).length} • You are ${(selectedUser.admins||[]).includes(currentUser.uid)?"Admin":"Member"}`;const box=$("manageMembers");box.innerHTML="";for(const uid of selectedUser.members||[]){const u=allUsers.find(x=>x.id===uid)||{name:uid};const row=document.createElement("div");row.className="check-item";row.innerHTML=`<span style="flex:1">${esc(u.name||u.email||uid)} ${(selectedUser.admins||[]).includes(uid)?"⭐":""}</span>`;if((selectedUser.admins||[]).includes(currentUser.uid)&&uid!==currentUser.uid){const rb=document.createElement("button");rb.className="small-btn danger";rb.textContent="Remove";rb.onclick=async()=>{await updateDoc(doc(db,"groups",manageGroupId),{members:arrayRemove(uid),admins:arrayRemove(uid)});toastMsg("Member removed");openGroupManage()};row.appendChild(rb);const ab=document.createElement("button");ab.className="small-btn";ab.textContent=(selectedUser.admins||[]).includes(uid)?"Demote":"Make admin";ab.onclick=async()=>{await updateDoc(doc(db,"groups",manageGroupId),{admins:(selectedUser.admins||[]).includes(uid)?arrayRemove(uid):arrayUnion(uid)});toastMsg("Admin updated");openGroupManage()};row.appendChild(ab)}box.appendChild(row)}$("groupManageModal").classList.remove("hidden")}
+$("chatMenuBtn").addEventListener("dblclick",openGroupManage);
+$("saveGroup").onclick=async()=>{if(!manageGroupId)return;const g=selectedUser;if(!(g.admins||[]).includes(currentUser.uid))return toastMsg("Only admin can edit group");const data={name:$("manageGroupName").value.trim()||g.name,description:$("manageGroupDescription").value.trim()};const f=$("manageGroupPhoto").files[0];if(f){const r=ref(storage,`groups/${manageGroupId}/photo`);await uploadBytes(r,f);data.photoURL=await getDownloadURL(r)}await updateDoc(doc(db,"groups",manageGroupId),data);$("groupManageModal").classList.add("hidden");await refreshGroups();toastMsg("Group updated")};
+$("leaveGroupBtn").onclick=async()=>{if(!manageGroupId||!confirm("Leave group?"))return;await updateDoc(doc(db,"groups",manageGroupId),{members:arrayRemove(currentUser.uid),admins:arrayRemove(currentUser.uid)});$("groupManageModal").classList.add("hidden");resetChat();await refreshGroups();toastMsg("Left group")};
+$("groupInviteBtn").onclick=()=>{if(!manageGroupId)return;$("inviteLink").textContent=`${location.origin}${location.pathname}?group=${encodeURIComponent(manageGroupId)}`;$("inviteModal").classList.remove("hidden")};
+$("copyInvite").onclick=()=>copyText($("inviteLink").textContent);
+
+$("searchMessagesBtn").onclick=()=>{if(!selectedChat)return;renderSearchResults("");$("messageSearchInput").value="";searchModal.classList.remove("hidden");$("messageSearchInput").focus()};
+$("messageSearchInput").oninput=()=>renderSearchResults($("messageSearchInput").value.trim().toLowerCase());
+function renderSearchResults(q){const box=$("messageSearchResults");const arr=loadedMessages.filter(m=>(m.text||"").toLowerCase().includes(q));box.innerHTML=arr.map(m=>`<div style="padding:9px;border-bottom:1px solid var(--line);cursor:pointer" onclick="window.scrollToMessage('${m.id}')"><b>${esc(m.senderName||"User")}</b><br>${esc(m.text||"[media]")}</div>`).join("")||"No result"}
+window.scrollToMessage=id=>{searchModal.classList.add("hidden");const i=loadedMessages.findIndex(m=>m.id===id);if(i>=0)messages.children[i]?.scrollIntoView({behavior:"smooth"})};
+
+document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>$(b.dataset.close).classList.add("hidden"));
+$("themeBtn").onclick=()=>{document.documentElement.classList.toggle("theme-light");localStorage.setItem("shaanTheme",document.documentElement.classList.contains("theme-light")?"light":"dark")};
+if(localStorage.getItem("shaanTheme")==="light")document.documentElement.classList.add("theme-light");
+logoutBtn.onclick=async()=>{await setPresence(false);await signOut(auth);resetChat()};
+$("notifyBtn").onclick=async()=>{await initNotifications(true)};
+
+async function initNotifications(force=false){if(!("Notification"in window))return toastMsg("Notifications unsupported");if(Notification.permission==="default"||force)await Notification.requestPermission();if(Notification.permission!=="granted"||!VAPID_KEY)return;if(!await isSupported())return;try{messaging=getMessaging(firebaseApp);notificationToken=await getToken(messaging,{vapidKey:VAPID_KEY});if(notificationToken)await setDoc(doc(db,"users",currentUser.uid,"tokens",btoa(notificationToken).slice(0,80)),{token:notificationToken,createdAt:serverTimestamp()},{merge:true});onMessage(messaging,p=>{if(p?.notification)new Notification(p.notification.title||"ShaanChat",{body:p.notification.body||"New message"})})}catch(e){console.warn(e)}}
+
+function renderAvatar(el,url,name){el.innerHTML="";if(url){const img=document.createElement("img");img.src=url;img.alt="";el.appendChild(img)}else el.textContent=(name||"U").trim().charAt(0).toUpperCase()}
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+function escAttr(s){return esc(s)}
+function safeFile(s){return String(s).replace(/[^a-zA-Z0-9._-]/g,"_")}
+function toastMsg(t){toast.textContent=t;toast.classList.remove("hidden");clearTimeout(window.__toast);window.__toast=setTimeout(()=>toast.classList.add("hidden"),2600)}
+</script>
+</body>
+</html>
