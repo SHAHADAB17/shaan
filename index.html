@@ -245,7 +245,11 @@ window.addEventListener("beforeunload",()=>{if(currentUser)navigator.sendBeacon&
 function listenUsers(){
   const q=query(collection(db,"users"));
   onSnapshot(q,snap=>{
-    allUsers=[];snap.forEach(x=>{if(x.id!==currentUser.uid)allUsers.push({id:x.id,...x.data()})});renderUsers(allUsers);
+    const people=[];
+    snap.forEach(x=>{if(x.id!==currentUser.uid)people.push({id:x.id,...x.data()})});
+    const groups=allUsers.filter(x=>x.isGroup);
+    allUsers=[...people,...groups];
+    renderUsers(allUsers);
   });
 }
 function renderUsers(users){
@@ -280,12 +284,38 @@ async function openChat(user,element){
   messageInput.disabled=false;sendBtn.disabled=false;app.classList.add("chat-open");
   if(unsubscribeChat)unsubscribeChat();if(unsubscribeTyping)unsubscribeTyping();
   const chatId=getChatId(user);
-  const chatRef=doc(db,"chats",chatId);const chatSnap=await getDoc(chatRef);
-  if(!chatSnap.exists()){
-    await setDoc(chatRef,{chatId,type:user.isGroup?"group":"direct",name:user.isGroup?user.name:null,participants:user.isGroup?user.participants:[currentUser.uid,user.id],createdAt:serverTimestamp(),typing:{}});
+  const chatRef=doc(db,"chats",chatId);
+  const participants=user.isGroup ? user.participants : [currentUser.uid,user.id];
+
+  try{
+    const chatSnap=await getDoc(chatRef);
+    if(!chatSnap.exists()){
+      await setDoc(chatRef,{
+        chatId,
+        type:user.isGroup?"group":"direct",
+        name:user.isGroup?user.name:null,
+        participants,
+        createdBy:currentUser.uid,
+        createdAt:serverTimestamp(),
+        typing:{}
+      });
+    }else{
+      const data=chatSnap.data()||{};
+      if(!Array.isArray(data.participants)||!data.participants.includes(currentUser.uid)){
+        throw new Error("You are not a participant in this chat.");
+      }
+    }
+
+    const finalSnap=await getDoc(chatRef);
+    selectedChat={id:chatId,...finalSnap.data()};
+    listenMessages(chatId);
+    listenTyping(chatId);
+  }catch(e){
+    console.error("Open chat error:",e);
+    toastMsg("Chat open failed: "+e.message);
+    messageInput.disabled=true;
+    sendBtn.disabled=true;
   }
-  selectedChat={id:chatId,...(await getDoc(chatRef)).data()};
-  listenMessages(chatId);listenTyping(chatId);
 }
 function getChatId(user=selectedUser){
   if(user?.isGroup)return user.chatId||user.id;
@@ -342,15 +372,56 @@ async function deleteMessage(d){
 function startReply(d){replyingTo=d;replyText.textContent="Replying to: "+(d.text||d.fileName||"attachment");replyBar.classList.remove("hidden");messageInput.focus()}
 cancelReply.onclick=()=>{replyingTo=null;replyBar.classList.add("hidden")}
 async function sendMessage(textOverride=null){
-  const text=textOverride??messageInput.value.trim();if(!text||!selectedChat)return;
+  const text=(textOverride??messageInput.value).trim();
+  if(!text||!selectedUser||!currentUser)return;
+
+  const chatId=getChatId(selectedUser);
+  const chatRef=doc(db,"chats",chatId);
+
   try{
-    await addDoc(collection(db,"chats",selectedChat.id,"messages"),{
-      text,senderId:currentUser.uid,receiverId:selectedUser.isGroup?null:selectedUser.id,
-      senderName:myName.textContent,type:"text",delivered:false,seen:false,replyTo:replyingTo?{id:replyingTo.id,text:replyingTo.text||replyingTo.fileName||"Attachment",senderName:replyingTo.senderName||"User"}:null,
+    const participants=selectedUser.isGroup
+      ? selectedUser.participants
+      : [currentUser.uid,selectedUser.id];
+
+    const chatSnap=await getDoc(chatRef);
+
+    if(!chatSnap.exists()){
+      await setDoc(chatRef,{
+        chatId,
+        type:selectedUser.isGroup?"group":"direct",
+        name:selectedUser.isGroup?selectedUser.name:null,
+        participants,
+        createdBy:currentUser.uid,
+        createdAt:serverTimestamp(),
+        typing:{}
+      });
+    }
+
+    selectedChat={id:chatId,...(await getDoc(chatRef)).data()};
+
+    await addDoc(collection(db,"chats",chatId,"messages"),{
+      text,
+      senderId:currentUser.uid,
+      receiverId:selectedUser.isGroup?null:selectedUser.id,
+      senderName:myName.textContent,
+      type:"text",
+      delivered:false,
+      seen:false,
+      replyTo:replyingTo?{
+        id:replyingTo.id,
+        text:replyingTo.text||replyingTo.fileName||"Attachment",
+        senderName:replyingTo.senderName||"User"
+      }:null,
       createdAt:serverTimestamp()
     });
-    messageInput.value="";cancelReply.click();clearTyping();
-  }catch(e){toastMsg("Message failed: "+e.message)}
+
+    messageInput.value="";
+    cancelReply.click();
+    clearTyping();
+  }catch(e){
+    console.error("Message send error:",e);
+    toastMsg("Message failed: "+(e?.message||"Unknown Firebase error"));
+  }
 }
 sendBtn.onclick=()=>sendMessage();
 messageInput.onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMessage()}};
