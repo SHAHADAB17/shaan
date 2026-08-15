@@ -40,7 +40,7 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
 .message{padding:10px 13px;border-radius:16px;line-height:1.4;word-break:break-word;background:var(--bubble);position:relative}.sent .message{background:var(--mine);border-bottom-right-radius:4px}.received .message{border-bottom-left-radius:4px}
 .message img.media{max-width:280px;max-height:300px;border-radius:12px;display:block}.file-card{display:flex;align-items:center;gap:9px;min-width:200px}.file-card a{color:#fff;text-decoration:none;font-weight:700}.message-time{display:block;font-size:10px;opacity:.65;margin-top:5px;text-align:right}.ticks{font-size:11px;margin-left:4px}.ticks.seen{color:#69efff}
 .reply-preview{border-left:3px solid var(--cyan);padding:6px 8px;margin-bottom:7px;background:rgba(0,0,0,.16);border-radius:7px;font-size:11px;opacity:.85}
-.message-actions{display:none;gap:4px;position:absolute;top:-35px;background:#111927;border:1px solid var(--line);padding:4px;border-radius:9px;z-index:3}.message-wrap:hover .message-actions{display:flex}.message-actions button{border:0;background:transparent;color:#cbd4e3;cursor:pointer;padding:4px}
+.message-actions{display:none;gap:4px;position:absolute;top:-35px;background:#111927;border:1px solid var(--line);padding:4px;border-radius:9px;z-index:3}.message-wrap:hover .message-actions{display:flex}.message-actions button{border:0;background:transparent;color:#cbd4e3;cursor:pointer;padding:5px 7px;border-radius:7px;font-size:12px}.message-actions button:hover{background:#1b2638;color:#fff}
 .typing{height:22px;padding:0 20px;color:#65dff0;font-size:12px;font-style:italic}
 .composer{padding:10px 14px;display:flex;gap:8px;border-top:1px solid var(--line);background:rgba(7,11,20,.88);align-items:center}.message-input{margin:0;flex:1}.send{width:50px;height:48px;border:0;border-radius:13px;background:var(--cyan);color:#001218;font-size:20px;cursor:pointer}.send:disabled{opacity:.35}.attach{width:42px;height:42px;border:0;background:transparent;color:#aab6c9;font-size:22px;cursor:pointer}.recording{color:#ff667d!important}.reply-bar{position:absolute;left:0;right:0;bottom:70px;padding:9px 14px;background:#111927;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px}.reply-bar .close{margin-left:auto;background:transparent;border:0;color:#ff667d;cursor:pointer}
 .app{position:relative}.toast{position:fixed;right:18px;bottom:18px;background:#111927;border:1px solid var(--line);padding:11px 14px;border-radius:10px;z-index:100;color:#fff;box-shadow:0 12px 35px rgba(0,0,0,.35)}
@@ -331,18 +331,45 @@ function listenMessages(chatId){
   const q=query(collection(db,"chats",chatId,"messages"),orderBy("createdAt","asc"));
   unsubscribeMessages=onSnapshot(q,snap=>{
     loadedMessages=[];messages.innerHTML="";
-    if(snap.empty){messages.innerHTML='<div class="empty">No messages yet. Say hello 👋</div>';return}
-    snap.forEach(x=>{const d={id:x.id,...x.data()};loadedMessages.push(d);renderMessage(d)});
-    scrollMessages();markMessagesDelivered(chatId);markMessagesSeen(chatId);
+    let visibleCount=0;
+    snap.forEach(x=>{
+      const d={id:x.id,...x.data()};
+      loadedMessages.push(d);
+      if(d.deletedFor && d.deletedFor[currentUser.uid]===true) return;
+      visibleCount++;
+      renderMessage(d);
+    });
+    if(visibleCount===0){
+      messages.innerHTML='<div class="empty">No messages yet. Say hello 👋</div>';
+    }
+    scrollMessages();
+    markMessagesDelivered(chatId);
+    markMessagesSeen(chatId);
   },e=>{console.error(e);toastMsg("Chat read error: "+e.message)});
 }
 function renderMessage(d){
   const sent=d.senderId===currentUser.uid;
   const wrap=document.createElement("div");wrap.className="message-wrap "+(sent?"sent":"received");wrap.dataset.id=d.id;
   const actions=document.createElement("div");actions.className="message-actions";
-  const reply=document.createElement("button");reply.textContent="↩";reply.title="Reply";reply.onclick=()=>startReply(d);
+  const reply=document.createElement("button");
+  reply.textContent="↩";
+  reply.title="Reply";
+  reply.onclick=()=>startReply(d);
   actions.appendChild(reply);
-  if(sent){const del=document.createElement("button");del.textContent="🗑";del.title="Delete";del.onclick=()=>deleteMessage(d);actions.appendChild(del)}
+
+  const delMe=document.createElement("button");
+  delMe.textContent="🗑 Me";
+  delMe.title="Delete for me";
+  delMe.onclick=()=>deleteForMe(d);
+  actions.appendChild(delMe);
+
+  if(sent){
+    const delEveryone=document.createElement("button");
+    delEveryone.textContent="🗑 All";
+    delEveryone.title="Delete for everyone";
+    delEveryone.onclick=()=>deleteForEveryone(d);
+    actions.appendChild(delEveryone);
+  }
   const bubble=document.createElement("div");bubble.className="message";
   if(d.replyTo)bubble.innerHTML+=`<div class="reply-preview">${esc(d.replyTo.senderName||"User")}: ${esc(d.replyTo.text||"Attachment")}</div>`;
   if(d.type==="image")bubble.innerHTML+=`<img class="media" src="${escAttr(d.url)}" alt="${escAttr(d.fileName||"image")}">`;
@@ -369,10 +396,34 @@ async function markMessagesSeen(chatId){
     }
   }
 }
-async function deleteMessage(d){
-  if(!selectedChat)return;if(!confirm("Delete this message?"))return;
-  try{await deleteDoc(doc(db,"chats",selectedChat.id,"messages",d.id));toastMsg("Message deleted");}
-  catch(e){toastMsg(e.message)}
+async function deleteForMe(d){
+  if(!selectedChat||!currentUser)return;
+  if(!confirm("Delete this message only for you?"))return;
+  try{
+    const messageRef=doc(db,"chats",selectedChat.id,"messages",d.id);
+    await updateDoc(messageRef,{[`deletedFor.${currentUser.uid}`]:true});
+    toastMsg("Message deleted for you");
+  }catch(e){
+    console.error("Delete for me:",e);
+    toastMsg("Delete failed: "+e.message);
+  }
+}
+
+async function deleteForEveryone(d){
+  if(!selectedChat||!currentUser)return;
+  if(d.senderId!==currentUser.uid){
+    toastMsg("You can delete for everyone only your own message.");
+    return;
+  }
+  if(!confirm("Delete this message for everyone?"))return;
+  try{
+    const messageRef=doc(db,"chats",selectedChat.id,"messages",d.id);
+    await deleteDoc(messageRef);
+    toastMsg("Message deleted for everyone");
+  }catch(e){
+    console.error("Delete for everyone:",e);
+    toastMsg("Delete failed: "+e.message);
+  }
 }
 function startReply(d){replyingTo=d;replyText.textContent="Replying to: "+(d.text||d.fileName||"attachment");replyBar.classList.remove("hidden");messageInput.focus()}
 cancelReply.onclick=()=>{replyingTo=null;replyBar.classList.add("hidden")}
