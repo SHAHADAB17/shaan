@@ -213,15 +213,50 @@ authBtn.onclick=async()=>{
         uid:credential.user.uid,name,email:email.value.trim(),online:true,lastSeen:serverTimestamp(),createdAt:serverTimestamp()
       });
     }else await signInWithEmailAndPassword(auth,email.value.trim(),password.value);
-  }catch(e){console.error(e);authError.textContent=e.message;}
+  }catch(e){
+    console.error("AUTH ERROR:",e);
+    const code=e?.code||"";
+    const messages={
+      "auth/invalid-credential":"Email or password is incorrect.",
+      "auth/invalid-login-credentials":"Email or password is incorrect.",
+      "auth/user-not-found":"No account exists with this email.",
+      "auth/wrong-password":"Incorrect password.",
+      "auth/invalid-email":"Please enter a valid email address.",
+      "auth/email-already-in-use":"This email is already registered. Login instead.",
+      "auth/weak-password":"Password must be at least 6 characters.",
+      "auth/operation-not-allowed":"Email/Password login is disabled in Firebase Authentication.",
+      "auth/network-request-failed":"Network error. Check your internet connection.",
+      "auth/too-many-requests":"Too many attempts. Try again later."
+    };
+    authError.textContent=messages[code] || (e?.message||"Login failed. Please try again.");
+  }
 };
 
 onAuthStateChanged(auth,async user=>{
   if(user){
-    currentUser=user;authScreen.style.display="none";app.classList.add("show");
-    await ensureUserProfile();await setPresence(true);await loadMyProfile();listenUsers();loadGroupIndex();initNotifications();
+    currentUser=user;
+    // IMPORTANT: Firebase Authentication success must not be blocked by
+    // Firestore profile/rules errors.
+    authScreen.style.display="none";
+    app.classList.add("show");
+    authError.textContent="";
+
+    try{ await ensureUserProfile(); }catch(e){
+      console.warn("Profile setup skipped:",e);
+    }
+    try{ await loadMyProfile(); }catch(e){
+      console.warn("Profile load skipped:",e);
+      myName.textContent=currentUser.displayName || currentUser.email?.split("@")[0] || "User";
+      renderAvatar(myAvatar,null,myName.textContent);
+    }
+    try{ await setPresence(true); }catch(e){ console.warn("Presence skipped:",e); }
+    try{ listenUsers(); }catch(e){ console.warn("Users listener skipped:",e); }
+    try{ loadGroupIndex(); }catch(e){ console.warn("Groups skipped:",e); }
+    try{ initNotifications(); }catch(e){ console.warn("Notifications skipped:",e); }
   }else{
-    currentUser=null;app.classList.remove("show");authScreen.style.display="flex";
+    currentUser=null;
+    app.classList.remove("show");
+    authScreen.style.display="flex";
   }
 });
 
