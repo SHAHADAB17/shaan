@@ -277,19 +277,26 @@ function esc(v){const d=document.createElement("div");d.textContent=v??"";return
 function escAttr(v){return esc(v).replace(/"/g,"&quot;")}
 
 async function openChat(user,element){
-  selectedUser=user;selectedChat=null;
-  document.querySelectorAll(".user").forEach(x=>x.classList.remove("active"));element.classList.add("active");
-  chatName.textContent=user.name||"User";renderAvatar(chatAvatar,user.photoURL,user.name);
+  selectedUser=user;
+  selectedChat=null;
+
+  document.querySelectorAll(".user").forEach(x=>x.classList.remove("active"));
+  element.classList.add("active");
+
+  chatName.textContent=user.name||"User";
+  renderAvatar(chatAvatar,user.photoURL,user.name);
   chatStatus.textContent=user.isGroup?"Group":(user.online?"● Online":lastSeen(user.lastSeen));
-  messageInput.disabled=false;sendBtn.disabled=false;app.classList.add("chat-open");
-  if(unsubscribeChat)unsubscribeChat();if(unsubscribeTyping)unsubscribeTyping();
+
+  if(unsubscribeMessages)unsubscribeMessages();
+  if(unsubscribeTyping)unsubscribeTyping();
+
   const chatId=getChatId(user);
   const chatRef=doc(db,"chats",chatId);
   const participants=user.isGroup ? user.participants : [currentUser.uid,user.id];
 
   try{
-    // Create the chat if it does not exist. This avoids a permission
-    // failure from reading a non-existent chat before creating it.
+    // For direct chats this uses a fresh dm_v2_ namespace, avoiding
+    // stale documents created by the previous chat implementation.
     await setDoc(chatRef,{
       chatId,
       type:user.isGroup?"group":"direct",
@@ -300,31 +307,31 @@ async function openChat(user,element){
       typing:{}
     },{merge:true});
 
-    const finalSnap=await getDoc(chatRef);
-    if(!finalSnap.exists()){
-      throw new Error("Chat document could not be created.");
-    }
+    const snap=await getDoc(chatRef);
+    if(!snap.exists()) throw new Error("Chat document was not created.");
 
-    const data=finalSnap.data()||{};
-    if(!Array.isArray(data.participants)||!data.participants.includes(currentUser.uid)){
-      throw new Error("You are not a participant in this chat.");
+    const data=snap.data()||{};
+    if(!Array.isArray(data.participants) || !data.participants.includes(currentUser.uid)){
+      throw new Error("This account is not a participant in the chat.");
     }
 
     selectedChat={id:chatId,...data};
     messageInput.disabled=false;
     sendBtn.disabled=false;
+    app.classList.add("chat-open");
+
     listenMessages(chatId);
     listenTyping(chatId);
   }catch(e){
     console.error("Open chat error:",e);
-    toastMsg("Chat open failed: "+(e?.message||"Unknown Firebase error"));
     messageInput.disabled=true;
     sendBtn.disabled=true;
+    toastMsg("Chat open failed: "+(e?.message||"Unknown Firebase error"));
   }
 }
 function getChatId(user=selectedUser){
   if(user?.isGroup)return user.chatId||user.id;
-  return [currentUser.uid,user.id].sort().join("_");
+  return "dm_v2_"+[currentUser.uid,user.id].sort().join("_");
 }
 function listenMessages(chatId){
   if(unsubscribeMessages)unsubscribeMessages();
