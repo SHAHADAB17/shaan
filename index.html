@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta name="theme-color" content="#070b14">
-<title>ShaanChat Pro</title>
+<title>ShaanChat Pro — Spark Edition</title>
 <style>
 :root{
   --bg:#070b14;--panel:#0b111d;--panel2:#101827;--line:rgba(255,255,255,.09);
@@ -31,7 +31,7 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
 .search{margin-top:16px;margin-bottom:0}.users{overflow:auto;flex:1}.section-label{padding:12px 18px;color:#68758c;font-size:11px;text-transform:uppercase;letter-spacing:.12em}
 .user{padding:14px 18px;display:flex;align-items:center;gap:11px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04)}.user:hover,.user.active{background:rgba(0,234,255,.08)}
 .user-avatar,.chat-avatar{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#172033;color:var(--cyan);font-weight:800;overflow:hidden;flex-shrink:0;position:relative}
-.user-info{min-width:0;flex:1}.user-name{font-weight:700}.user-email{color:#8490a5;font-size:11px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.presence-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#5d687b;margin-right:5px}.presence-dot.online{background:#2ce68d;box-shadow:0 0 8px #2ce68d}
+.user-info{min-width:0;flex:1}.user-name{font-weight:700}.user-actions{display:flex;gap:4px;margin-left:auto}.user-actions button{border:1px solid var(--line);background:#111927;color:#aeb9cb;border-radius:7px;padding:4px 6px;font-size:10px;cursor:pointer}.user-actions button:hover{color:#fff;border-color:var(--cyan)}.user-email{color:#8490a5;font-size:11px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.presence-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#5d687b;margin-right:5px}.presence-dot.online{background:#2ce68d;box-shadow:0 0 8px #2ce68d}
 .chat{flex:1;display:flex;flex-direction:column;min-width:0}.chat-header{min-height:75px;padding:12px 18px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line);background:rgba(7,11,20,.76)}
 .chat-head-info{min-width:0}.chat-title{font-weight:800}.chat-status{font-size:12px;color:var(--green);margin-top:3px}.chat-tools{margin-left:auto;display:flex;gap:7px}.icon-btn{width:38px;height:38px;border:1px solid var(--line);border-radius:10px;background:#111927;color:#d7deeb;cursor:pointer}
 .mobile-back{display:none;border:0;background:transparent;color:var(--cyan);font-size:21px}
@@ -101,8 +101,8 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
     <div class="typing" id="typingIndicator"></div>
     <div class="reply-bar hidden" id="replyBar"><div id="replyText"></div><button class="close" id="cancelReply">✕</button></div>
     <div class="composer">
-      <input type="file" id="fileInput" hidden multiple>
-      <button class="attach" id="attachBtn" title="Image/file">📎</button>
+      <input type="file" id="fileInput" hidden multiple accept="image/*">
+      <button class="attach" id="attachBtn" title="Send image">📎</button>
       <button class="attach" id="recordBtn" title="Voice message">🎤</button>
       <input class="message-input" id="messageInput" placeholder="Type a message..." disabled>
       <button class="send" id="sendBtn" disabled>➤</button>
@@ -112,7 +112,7 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
 
 <div class="modal hidden" id="profileModal">
   <div class="modal-card">
-    <div class="modal-title">Profile</div>
+    <div class="modal-title">Profile</div><div style="font-size:12px;color:#8490a5;margin-bottom:12px">Profile photo works on the free Spark plan.</div>
     <input class="input" id="profileName" placeholder="Name">
     <input type="file" class="input" id="profilePhoto" accept="image/*">
     <div class="modal-actions"><button class="small-btn" data-close="profileModal">Cancel</button><button class="small-btn" id="saveProfile">Save</button></div>
@@ -121,7 +121,7 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
 
 <div class="modal hidden" id="groupModal">
   <div class="modal-card">
-    <div class="modal-title">Create group</div>
+    <div class="modal-title">Create group</div><div style="font-size:12px;color:#8490a5;margin-bottom:12px">After creation, use Archive or Delete on the group card.</div>
     <input class="input" id="groupName" placeholder="Group name" maxlength="50">
     <div class="check-list" id="groupUsers"></div>
     <div class="modal-actions"><button class="small-btn" data-close="groupModal">Cancel</button><button class="small-btn" id="createGroup">Create</button></div>
@@ -264,8 +264,14 @@ function renderUsers(users){
 function renderUser(user){
   const div=document.createElement("div");div.className="user";
   const online=user.isGroup?true:!!user.online;
-  div.innerHTML=`<div class="user-avatar"></div><div class="user-info"><div class="user-name">${esc(user.name||"User")}</div><div class="user-email"><span class="presence-dot ${online?"online":""}"></span>${user.isGroup?"Group":(online?"Online":lastSeen(user.lastSeen))}</div></div>`;
+  div.innerHTML=`<div class="user-avatar"></div><div class="user-info"><div class="user-name">${esc(user.name||"User")}</div><div class="user-email"><span class="presence-dot ${online?"online":""}"></span>${user.isGroup?"Group":(online?"Online":lastSeen(user.lastSeen))}</div></div>${user.isGroup?'<div class="user-actions"><button class="archive-group" title="Archive group">Archive</button>'+(user.createdBy===currentUser?.uid?'<button class="delete-group" title="Delete group">Delete</button>':"")+'</div>':'}`;
   renderAvatar(div.querySelector(".user-avatar"),user.photoURL,user.name);
+  if(user.isGroup){
+    const a=div.querySelector(".archive-group");
+    if(a)a.onclick=e=>{e.stopPropagation();archiveGroup(user)};
+    const d=div.querySelector(".delete-group");
+    if(d)d.onclick=e=>{e.stopPropagation();deleteGroup(user)};
+  }
   div.onclick=()=>openChat(user,div);usersList.appendChild(div);
 }
 function lastSeen(ts){if(!ts?.toDate)return"Offline";return"Last seen "+formatTime(ts.toDate())}
@@ -500,22 +506,40 @@ async function clearTyping(){
 }
 
 attachBtn.onclick=()=>{if(!selectedChat)return toastMsg("Select a chat first");fileInput.click()};
-fileInput.onchange=async()=>{const files=[...fileInput.files];for(const f of files)await uploadAttachment(f);fileInput.value=""};
+fileInput.onchange=async()=>{
+  const files=[...fileInput.files];
+  for(const f of files)await uploadAttachment(f);
+  fileInput.value="";
+};
 async function uploadAttachment(file){
-  if(file.size>20*1024*1024)return toastMsg("Maximum file size is 20 MB.");
-  const path=`chatFiles/${selectedChat.id}/${currentUser.uid}/${Date.now()}_${file.name.replace(/[^\w.\- ]/g,"_")}`;
+  if(!file.type.startsWith("image/")){
+    return toastMsg("Spark mode supports image sharing. Files/voice need Firebase Storage.");
+  }
   try{
-    toastMsg("Uploading "+file.name+"…");const r=ref(storage,path);await uploadBytes(r,file);const url=await getDownloadURL(r);
-    const type=file.type.startsWith("image/")?"image":"file";
+    toastMsg("Preparing "+file.name+"…");
+    const dataURL=await compressImageToDataURL(file,1280,1280,650*1024);
     await addDoc(collection(db,"chats",selectedChat.id,"messages"),{
-      type,url,fileName:file.name,mimeType:file.type,size:file.size,senderId:currentUser.uid,
-      receiverId:selectedUser.isGroup?null:selectedUser.id,senderName:myName.textContent,seen:false,createdAt:serverTimestamp()
-    });toastMsg("Uploaded");
-  }catch(e){console.error(e);toastMsg("Upload failed. Enable Firebase Storage and publish its rules.")}
+      type:"image",
+      url:dataURL,
+      fileName:file.name,
+      mimeType:"image/jpeg",
+      senderId:currentUser.uid,
+      receiverId:selectedUser.isGroup?null:selectedUser.id,
+      senderName:myName.textContent,
+      delivered:false,
+      seen:false,
+      createdAt:serverTimestamp()
+    });
+    toastMsg("Image sent");
+  }catch(e){
+    console.error(e);
+    toastMsg("Image send failed: "+e.message);
+  }
 }
 
 recordBtn.onclick=async()=>{
   if(!selectedChat)return toastMsg("Select a chat first");
+  return toastMsg("Voice messages need Firebase Storage (Blaze). Text and images work on Spark.");
   if(isRecording){mediaRecorder.stop();isRecording=false;recordBtn.classList.remove("recording");recordBtn.textContent="🎤";return}
   if(!navigator.mediaDevices?.getUserMedia)return toastMsg("Voice recording is not supported.");
   try{
@@ -532,17 +556,99 @@ async function uploadVoice(blob){
   catch(e){toastMsg("Voice upload failed. Enable Firebase Storage.")}
 }
 
+
+function compressImageToDataURL(file,maxWidth,maxHeight,maxBytes){
+  return new Promise((resolve,reject)=>{
+    if(!file || !file.type.startsWith("image/")) return reject(new Error("Please select an image."));
+    const objectURL=URL.createObjectURL(file);
+    const img=new Image();
+    img.onload=()=>{
+      try{
+        let w=img.naturalWidth,h=img.naturalHeight;
+        const scale=Math.min(1,maxWidth/w,maxHeight/h);
+        w=Math.max(1,Math.round(w*scale));h=Math.max(1,Math.round(h*scale));
+        const canvas=document.createElement("canvas");
+        canvas.width=w;canvas.height=h;
+        const ctx=canvas.getContext("2d");
+        ctx.drawImage(img,0,0,w,h);
+        let quality=.82;
+        let data=canvas.toDataURL("image/jpeg",quality);
+        while(data.length>maxBytes*1.37 && quality>.35){
+          quality-=.07;
+          data=canvas.toDataURL("image/jpeg",quality);
+        }
+        URL.revokeObjectURL(objectURL);
+        if(data.length>maxBytes*1.37) return reject(new Error("Image is too large. Please choose a smaller image."));
+        resolve(data);
+      }catch(e){
+        URL.revokeObjectURL(objectURL);reject(e);
+      }
+    };
+    img.onerror=()=>{URL.revokeObjectURL(objectURL);reject(new Error("Could not read image."))};
+    img.src=objectURL;
+  });
+}
+
+async function archiveGroup(group){
+  if(!group?.isGroup||!currentUser)return;
+  if(!confirm(`Archive "${group.name||"group"}" for you?`))return;
+  try{
+    await updateDoc(doc(db,"users",currentUser.uid),{[`archivedGroups.${group.id}`]:true});
+    allUsers=allUsers.filter(x=>!(x.isGroup&&x.id===group.id));
+    renderUsers(allUsers);
+    if(selectedUser?.isGroup&&selectedUser.id===group.id){
+      selectedUser=null;selectedChat=null;app.classList.remove("chat-open");
+    }
+    toastMsg("Group archived for you");
+  }catch(e){console.error(e);toastMsg("Archive failed: "+e.message)}
+}
+
+async function deleteGroup(group){
+  if(!group?.isGroup||!currentUser)return;
+  if(group.createdBy!==currentUser.uid){
+    return toastMsg("Only the group creator can delete this group.");
+  }
+  if(!confirm(`Delete "${group.name||"group"}" for everyone?`))return;
+  try{
+    await updateDoc(doc(db,"groupIndex",group.id),{
+      deleted:true,
+      deletedAt:serverTimestamp(),
+      deletedBy:currentUser.uid
+    });
+    await updateDoc(doc(db,"chats",group.chatId||group.id),{
+      deleted:true,
+      deletedAt:serverTimestamp(),
+      deletedBy:currentUser.uid
+    });
+    allUsers=allUsers.filter(x=>!(x.isGroup&&x.id===group.id));
+    renderUsers(allUsers);
+    if(selectedUser?.isGroup&&selectedUser.id===group.id){
+      selectedUser=null;selectedChat=null;app.classList.remove("chat-open");
+    }
+    toastMsg("Group deleted");
+  }catch(e){console.error(e);toastMsg("Group delete failed: "+e.message)}
+}
+
 $("profileBtn").onclick=async()=>{
   const s=await getDoc(doc(db,"users",currentUser.uid));const d=s.data()||{};$("profileName").value=d.name||"";profileModal.classList.remove("hidden");
 };
 $("saveProfile").onclick=async()=>{
   const name=$("profileName").value.trim();if(!name)return toastMsg("Enter a name.");
   try{
-    let photoURL=null;const f=$("profilePhoto").files[0];
-    if(f){const r=ref(storage,`profiles/${currentUser.uid}/avatar_${Date.now()}`);await uploadBytes(r,f);photoURL=await getDownloadURL(r)}
-    const update={name};if(photoURL)update.photoURL=photoURL;
-    await updateDoc(doc(db,"users",currentUser.uid),update);await loadMyProfile();profileModal.classList.add("hidden");toastMsg("Profile updated");
-  }catch(e){toastMsg("Profile upload failed. Enable Firebase Storage.")}
+    const f=$("profilePhoto").files[0];
+    const update={name};
+    if(f){
+      update.photoURL=await compressImageToDataURL(f,512,512,220*1024);
+    }
+    await updateDoc(doc(db,"users",currentUser.uid),update);
+    await loadMyProfile();
+    $("profilePhoto").value="";
+    profileModal.classList.add("hidden");
+    toastMsg("Profile updated");
+  }catch(e){
+    console.error(e);
+    toastMsg("Profile update failed: "+e.message);
+  }
 };
 
 $("groupBtn").onclick=()=>{
@@ -554,16 +660,25 @@ $("createGroup").onclick=async()=>{
   const name=$("groupName").value.trim();const ids=[...document.querySelectorAll("#groupUsers input:checked")].map(x=>x.value);
   if(!name||!ids.length)return toastMsg("Enter a group name and select users.");
   try{
-    const participants=[currentUser.uid,...ids];const c=await addDoc(collection(db,"chats"),{type:"group",name,participants,createdBy:currentUser.uid,createdAt:serverTimestamp(),typing:{}});
+    const participants=[...new Set([currentUser.uid,...ids])].sort();const c=await addDoc(collection(db,"chats"),{type:"group",name,participants,createdBy:currentUser.uid,createdAt:serverTimestamp(),typing:{}});
     await setDoc(doc(db,"groupIndex",c.id),{chatId:c.id,name,participants,createdBy:currentUser.uid,createdAt:serverTimestamp()});
     groupModal.classList.add("hidden");toastMsg("Group created. Refreshing list…");loadGroupIndex();
   }catch(e){toastMsg("Group create failed: "+e.message)}
 };
 async function loadGroupIndex(){
   try{
-    const snap=await getDocs(query(collection(db,"groupIndex"),where("participants","array-contains",currentUser.uid)));const groups=[];
-    snap.forEach(x=>{const d=x.data();if((d.participants||[]).includes(currentUser.uid))groups.push({id:x.id,chatId:x.id,isGroup:true,...d})});
-    allUsers=[...allUsers.filter(x=>!x.isGroup),...groups];renderUsers(allUsers);
+    const us=await getDoc(doc(db,"users",currentUser.uid));
+    const archived=us.data()?.archivedGroups||{};
+    const snap=await getDocs(query(collection(db,"groupIndex"),where("participants","array-contains",currentUser.uid)));
+    const groups=[];
+    snap.forEach(x=>{
+      const d=x.data();
+      if((d.participants||[]).includes(currentUser.uid)&&!d.deleted&&!archived[x.id]){
+        groups.push({id:x.id,chatId:d.chatId||x.id,isGroup:true,...d});
+      }
+    });
+    allUsers=[...allUsers.filter(x=>!x.isGroup),...groups];
+    renderUsers(allUsers);
   }catch(e){console.warn("Group index:",e.message)}
 }
 setInterval(()=>{if(currentUser)loadGroupIndex()},10000);
