@@ -58,7 +58,10 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
   <div class="auth-box">
     <div class="logo">shaan<span>Chat</span></div>
     <div class="subtitle">Private real-time messaging</div>
-    <div id="registerFields" class="hidden"><input class="input" id="registerName" placeholder="Your name" maxlength="40"></div>
+    <div id="registerFields" class="hidden">
+      <input class="input" id="registerName" placeholder="Your name" maxlength="40">
+      <input class="input" id="registerUsername" placeholder="Username (e.g. shaan123)" maxlength="20" autocomplete="username">
+    </div>
     <input class="input" id="email" type="email" placeholder="Email address">
     <input class="input" id="password" type="password" placeholder="Password">
     <button class="btn auth-main-btn" id="authBtn">Login</button>
@@ -73,7 +76,7 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
       <div class="brand">shaan<span>Chat</span></div>
       <div class="me">
         <div class="avatar" id="myAvatar">U</div>
-        <div class="me-info"><strong id="myName">User</strong><small id="myPresence">● Online</small></div>
+        <div class="me-info"><strong id="myName">User</strong><small id="myUsername" style="display:block;color:#8490a5;margin-top:2px"></small><small id="myPresence">● Online</small></div>
         <button class="logout" id="logoutBtn">Logout</button>
       </div>
       <div class="profile-actions">
@@ -93,6 +96,7 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
       <div class="chat-avatar" id="chatAvatar">?</div>
       <div class="chat-head-info">
         <div class="chat-title" id="chatName">Select a user</div>
+        <div id="chatUsername" style="font-size:11px;color:#00eaff;margin-top:2px"></div>
         <div class="chat-status" id="chatStatus">Start a conversation</div>
       </div>
       <div class="chat-tools">
@@ -116,6 +120,7 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
   <div class="modal-card">
     <div class="modal-title">Profile</div>
     <input class="input" id="profileName" placeholder="Name">
+    <input class="input" id="profileUsername" placeholder="Username (e.g. shaan123)" maxlength="20">
     <input type="file" class="input" id="profilePhoto" accept="image/*">
     <div class="modal-actions"><button class="small-btn" data-close="profileModal">Cancel</button><button class="small-btn" id="saveProfile">Save</button></div>
   </div>
@@ -186,11 +191,11 @@ const db=getFirestore(firebaseApp);
 const storage=getStorage(firebaseApp);
 
 const $=id=>document.getElementById(id);
-const authScreen=$("authScreen"),app=$("app"),registerFields=$("registerFields"),registerName=$("registerName");
+const authScreen=$("authScreen"),app=$("app"),registerFields=$("registerFields"),registerName=$("registerName"),registerUsername=$("registerUsername");
 const email=$("email"),password=$("password"),authBtn=$("authBtn"),switchText=$("switchText"),authError=$("authError");
 const usersList=$("usersList"),messages=$("messages"),messageInput=$("messageInput"),sendBtn=$("sendBtn");
-const myName=$("myName"),myAvatar=$("myAvatar"),myPresence=$("myPresence"),chatName=$("chatName"),chatAvatar=$("chatAvatar");
-const chatStatus=$("chatStatus"),logoutBtn=$("logoutBtn"),searchUsers=$("searchUsers"),backBtn=$("backBtn");
+const myName=$("myName"),myAvatar=$("myAvatar"),myPresence=$("myPresence"),myUsername=$("myUsername"),chatName=$("chatName"),chatAvatar=$("chatAvatar"),profileUsername=$("profileUsername");
+const chatStatus=$("chatStatus"),chatUsername=$("chatUsername"),logoutBtn=$("logoutBtn"),searchUsers=$("searchUsers"),backBtn=$("backBtn");
 const typingIndicator=$("typingIndicator"),replyBar=$("replyBar"),replyText=$("replyText"),cancelReply=$("cancelReply");
 const fileInput=$("fileInput"),attachBtn=$("attachBtn"),recordBtn=$("recordBtn"),toast=$("toast");
 const profileModal=$("profileModal"),groupModal=$("groupModal"),searchModal=$("searchModal");
@@ -205,14 +210,43 @@ switchText.onclick=()=>{
   switchText.textContent=isRegister?"Already have an account? Login":"Create a new account";authError.textContent="";
 };
 
+function normalizeUsername(value){
+  return (value||"").trim().toLowerCase().replace(/^@+/,"");
+}
+function validateUsername(username){
+  if(!username) throw new Error("Enter a username.");
+  if(username.length<3 || username.length>20) throw new Error("Username must be 3-20 characters.");
+  if(!/^[a-z0-9._]+$/.test(username)) throw new Error("Username can use only letters, numbers, dot and underscore.");
+}
+function displayUsername(user){
+  return user?.username ? "@"+user.username : "";
+}
+function userSearchText(user){
+  return [user?.name,user?.username,user?.email].filter(Boolean).join(" ").toLowerCase();
+}
+
 authBtn.onclick=async()=>{
   authError.textContent="";
   try{
     if(isRegister){
-      const name=registerName.value.trim(); if(!name) throw new Error("Enter your name.");
+      const name=registerName.value.trim();
+      const username=normalizeUsername(registerUsername.value);
+      if(!name) throw new Error("Enter your name.");
+      validateUsername(username);
+
+      const usernameSnap=await getDocs(query(collection(db,"users"),where("usernameLower","==",username)));
+      if(!usernameSnap.empty) throw new Error("Username already taken. Choose another.");
+
       const credential=await createUserWithEmailAndPassword(auth,email.value.trim(),password.value);
       await setDoc(doc(db,"users",credential.user.uid),{
-        uid:credential.user.uid,name,email:email.value.trim(),online:true,lastSeen:serverTimestamp(),createdAt:serverTimestamp()
+        uid:credential.user.uid,
+        name,
+        username,
+        usernameLower:username,
+        email:email.value.trim(),
+        online:true,
+        lastSeen:serverTimestamp(),
+        createdAt:serverTimestamp()
       });
     }else await signInWithEmailAndPassword(auth,email.value.trim(),password.value);
   }catch(e){console.error(e);authError.textContent=e.message;}
@@ -229,11 +263,40 @@ onAuthStateChanged(auth,async user=>{
 
 async function ensureUserProfile(){
   const r=doc(db,"users",currentUser.uid),s=await getDoc(r);
-  if(!s.exists()) await setDoc(r,{uid:currentUser.uid,name:currentUser.email?.split("@")[0]||"User",email:currentUser.email||"",online:true,lastSeen:serverTimestamp(),createdAt:serverTimestamp()});
+  if(!s.exists()){
+    const base=normalizeUsername((currentUser.email||"user").split("@")[0]).replace(/[^a-z0-9._]/g,"").slice(0,16)||"user";
+    let username=base;
+    let n=1;
+    while(true){
+      const q=await getDocs(query(collection(db,"users"),where("usernameLower","==",username)));
+      if(q.empty)break;
+      username=(base.slice(0,14)+n).slice(0,20); n++;
+    }
+    await setDoc(r,{
+      uid:currentUser.uid,
+      name:currentUser.email?.split("@")[0]||"User",
+      username,
+      usernameLower:username,
+      email:currentUser.email||"",
+      online:true,lastSeen:serverTimestamp(),createdAt:serverTimestamp()
+    });
+  }else{
+    const d=s.data();
+    if(!d.username){
+      const base=normalizeUsername(d.name||currentUser.email?.split("@")[0]||"user").replace(/[^a-z0-9._]/g,"").slice(0,16)||"user";
+      let username=base, n=1;
+      while(true){
+        const q=await getDocs(query(collection(db,"users"),where("usernameLower","==",username)));
+        if(q.empty || (q.size===1 && q.docs[0].id===currentUser.uid))break;
+        username=(base.slice(0,14)+n).slice(0,20); n++;
+      }
+      await updateDoc(r,{username,usernameLower:username});
+    }
+  }
 }
 async function loadMyProfile(){
   const s=await getDoc(doc(db,"users",currentUser.uid));if(!s.exists())return;const d=s.data();
-  myName.textContent=d.name||"User";renderAvatar(myAvatar,d.photoURL,d.name);
+  myName.textContent=d.name||"User";myUsername.textContent=displayUsername(d);renderAvatar(myAvatar,d.photoURL,d.name);
 }
 async function setPresence(online){
   if(!currentUser)return;
@@ -266,7 +329,11 @@ function renderUsers(users){
 function renderUser(user){
   const div=document.createElement("div");div.className="user";
   const online=user.isGroup?true:!!user.online;
-  div.innerHTML=`<div class="user-avatar"></div><div class="user-info"><div class="user-name">${esc(user.name||"User")}</div><div class="user-email"><span class="presence-dot ${online?"online":""}"></span>${user.isGroup?"Group":(online?"Online":lastSeen(user.lastSeen))}</div></div>`;
+  div.innerHTML=`<div class="user-avatar"></div><div class="user-info">
+    <div class="user-name">${esc(user.name||"User")}</div>
+    ${user.isGroup?"":`<div style="color:#00eaff;font-size:11px;margin-top:2px">${esc(displayUsername(user))}</div>`}
+    <div class="user-email"><span class="presence-dot ${online?"online":""}"></span>${user.isGroup?"Group":(online?"Online":lastSeen(user.lastSeen))}</div>
+  </div>`;
   renderAvatar(div.querySelector(".user-avatar"),user.photoURL,user.name);
 
   if(user.isGroup){
@@ -305,6 +372,7 @@ async function openChat(user,element){
   element.classList.add("active");
 
   chatName.textContent=user.name||"User";
+  chatUsername.textContent=user.isGroup?"":displayUsername(user);
   renderAvatar(chatAvatar,user.photoURL,user.name);
   chatStatus.textContent=user.isGroup?"Group":(user.online?"● Online":lastSeen(user.lastSeen));
 
@@ -554,7 +622,7 @@ async function uploadVoice(blob){
 }
 
 $("profileBtn").onclick=async()=>{
-  const s=await getDoc(doc(db,"users",currentUser.uid));const d=s.data()||{};$("profileName").value=d.name||"";profileModal.classList.remove("hidden");
+  const s=await getDoc(doc(db,"users",currentUser.uid));const d=s.data()||{};$("profileName").value=d.name||"";profileUsername.value=d.username||"";profileModal.classList.remove("hidden");
 };
 async function imageToDataURL(file){
   if(!file)return null;
@@ -579,13 +647,20 @@ async function imageToDataURL(file){
 
 $("saveProfile").onclick=async()=>{
   const name=$("profileName").value.trim();
+  const username=normalizeUsername(profileUsername.value);
   if(!name)return toastMsg("Enter a name.");
 
   try{
+    validateUsername(username);
+    toastMsg("Checking username...");
+    const usernameSnap=await getDocs(query(collection(db,"users"),where("usernameLower","==",username)));
+    const takenByOther=usernameSnap.docs.some(x=>x.id!==currentUser.uid);
+    if(takenByOther)return toastMsg("Username already taken. Choose another.");
+
     toastMsg("Saving profile...");
     const f=$("profilePhoto").files?.[0];
     const photoURL=f?await imageToDataURL(f):null;
-    const update={name,updatedAt:serverTimestamp()};
+    const update={name,username,usernameLower:username,updatedAt:serverTimestamp()};
     if(photoURL)update.photoURL=photoURL;
 
     await updateDoc(doc(db,"users",currentUser.uid),update);
@@ -696,8 +771,8 @@ async function loadGroupIndex(){
 setInterval(()=>{if(currentUser)loadGroupIndex()},10000);
 
 searchUsers.oninput=()=>{
-  const term=searchUsers.value.toLowerCase().trim();
-  renderUsers(allUsers.filter(u=>(u.name||"").toLowerCase().includes(term)||(u.email||"").toLowerCase().includes(term)));
+  const term=searchUsers.value.toLowerCase().trim().replace(/^@+/,"");
+  renderUsers(allUsers.filter(u=>userSearchText(u).includes(term)));
 };
 $("searchMessagesBtn").onclick=()=>{
   if(!selectedChat)return toastMsg("Select a chat first");
