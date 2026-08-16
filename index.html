@@ -66,6 +66,23 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
 .permission-row span{font-size:12px;color:#cbd4e3}
 .group-settings-scroll{max-height:55vh;overflow:auto;padding-right:2px}
 @media(max-width:600px){.group-settings-grid{grid-template-columns:1fr}.modal-card{padding:16px}.group-member-actions{width:100%;justify-content:flex-start}}
+/* ===== PROFILE IMAGE VIEWER FIX ===== */
+.profile-avatar-click{cursor:pointer;transition:transform .18s ease,filter .18s ease}
+.profile-avatar-click:hover{transform:scale(1.04);filter:brightness(1.08)}
+.profile-image-modal{position:fixed;inset:0;background:rgba(0,0,0,.88);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px}
+.profile-image-card{position:relative;max-width:min(92vw,720px);max-height:90vh;text-align:center}
+.profile-image-large{display:block;max-width:min(92vw,720px);max-height:78vh;width:auto;height:auto;object-fit:contain;border-radius:18px;border:1px solid rgba(255,255,255,.14);box-shadow:0 25px 90px rgba(0,0,0,.6);background:#0b111d}
+.profile-image-name{margin-top:12px;color:#fff;font-weight:800;font-size:16px}
+.profile-image-close{position:absolute;right:-8px;top:-14px;width:40px;height:40px;border:1px solid rgba(255,255,255,.15);border-radius:50%;background:#111927;color:#fff;font-size:20px;cursor:pointer;z-index:2}
+.profile-photo-preview{width:96px;height:96px;margin:0 auto 12px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--cyan),var(--purple));font-weight:900;font-size:30px;color:#fff;cursor:pointer}
+.profile-photo-preview img{width:100%;height:100%;object-fit:cover}
+.profile-photo-hint{text-align:center;color:#8490a5;font-size:11px;margin:-3px 0 12px}
+@media(max-width:600px){
+  .profile-image-card{max-width:96vw}
+  .profile-image-large{max-width:96vw;max-height:72vh;border-radius:14px}
+  .profile-image-close{right:0;top:-48px}
+}
+
 
 /* ===== STEP 10: Voice / Video Calls ===== */
 .call-actions{display:flex;gap:7px;margin-left:auto}
@@ -170,6 +187,8 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
 <div class="modal hidden" id="profileModal">
   <div class="modal-card">
     <div class="modal-title">Profile</div>
+    <div class="profile-photo-preview profile-avatar-click" id="profilePhotoPreview">U</div>
+    <div class="profile-photo-hint">Tap your photo to view it</div>
     <input class="input" id="profileName" placeholder="Name">
     <input class="input" id="profileUsername" placeholder="Username (e.g. shaan123)" maxlength="20">
     <input type="file" class="input" id="profilePhoto" accept="image/*">
@@ -263,6 +282,15 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
   </div>
 </div>
 
+
+<div class="profile-image-modal hidden" id="profileImageModal">
+  <div class="profile-image-card">
+    <button class="profile-image-close" id="closeProfileImage" aria-label="Close">✕</button>
+    <img class="profile-image-large" id="profileImageLarge" alt="Profile photo">
+    <div class="profile-image-name" id="profileImageName"></div>
+  </div>
+</div>
+
 <div class="toast hidden" id="toast"></div>
 
 <script type="module">
@@ -318,6 +346,9 @@ const chatStatus=$("chatStatus"),chatUsername=$("chatUsername"),logoutBtn=$("log
 const typingIndicator=$("typingIndicator"),replyBar=$("replyBar"),replyText=$("replyText"),cancelReply=$("cancelReply");
 const fileInput=$("fileInput"),attachBtn=$("attachBtn"),recordBtn=$("recordBtn"),toast=$("toast");
 const profileModal=$("profileModal"),groupModal=$("groupModal"),searchModal=$("searchModal");
+const profilePhotoPreview=$("profilePhotoPreview"),profileImageModal=$("profileImageModal"),
+      profileImageLarge=$("profileImageLarge"),profileImageName=$("profileImageName"),
+      closeProfileImage=$("closeProfileImage");
 const groupSettingsModal=$("groupSettingsModal"),groupSettingsBtn=$("groupSettingsBtn");
 const groupMembersList=$("groupMembersList"),groupSettingsName=$("groupSettingsName");
 const groupDescription=$("groupDescription"),groupPhotoInput=$("groupPhotoInput");
@@ -498,8 +529,37 @@ function renderUser(user){
 }
 function lastSeen(ts){if(!ts?.toDate)return"Offline";return"Last seen "+formatTime(ts.toDate())}
 function renderAvatar(el,url,name){
-  if(url)el.innerHTML=`<img src="${escAttr(url)}" alt="">`;else el.textContent=getInitials(name);
+  if(!el)return;
+  el.classList.add("profile-avatar-click");
+  el.dataset.photoUrl=url||"";
+  el.dataset.photoName=name||"User";
+  if(url){
+    el.innerHTML=`<img src="${escAttr(url)}" alt="${escAttr(name||"Profile photo")}">`;
+    el.onclick=()=>openProfileImage(url,name);
+  }else{
+    el.innerHTML="";
+    el.textContent=getInitials(name);
+    el.onclick=null;
+  }
 }
+function openProfileImage(url,name){
+  if(!url)return toastMsg("This user has no profile photo.");
+  profileImageLarge.src=url;
+  profileImageLarge.alt=(name||"User")+" profile photo";
+  profileImageName.textContent=name||"User";
+  profileImageModal.classList.remove("hidden");
+}
+function closeProfileImageViewer(){
+  profileImageModal.classList.add("hidden");
+  profileImageLarge.removeAttribute("src");
+}
+closeProfileImage.onclick=closeProfileImageViewer;
+profileImageModal.onclick=e=>{
+  if(e.target===profileImageModal || e.target===profileImageLarge)closeProfileImageViewer();
+};
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"&&!profileImageModal.classList.contains("hidden"))closeProfileImageViewer();
+});
 function getInitials(n){return(n||"U").split(/\s+/).map(x=>x[0]).join("").slice(0,2).toUpperCase()}
 function esc(v){const d=document.createElement("div");d.textContent=v??"";return d.innerHTML}
 function escAttr(v){return esc(v).replace(/"/g,"&quot;")}
@@ -925,7 +985,17 @@ async function uploadVoice(blob){
 }
 
 $("profileBtn").onclick=async()=>{
-  const s=await getDoc(doc(db,"users",currentUser.uid));const d=s.data()||{};$("profileName").value=d.name||"";profileUsername.value=d.username||"";profileModal.classList.remove("hidden");
+  const s=await getDoc(doc(db,"users",currentUser.uid));
+  const d=s.data()||{};
+  $("profileName").value=d.name||"";
+  profileUsername.value=d.username||"";
+  renderAvatar(profilePhotoPreview,d.photoURL,d.name);
+  if(d.photoURL){
+    profilePhotoPreview.onclick=()=>openProfileImage(d.photoURL,d.name);
+  }else{
+    profilePhotoPreview.onclick=()=>toastMsg("No profile photo uploaded yet.");
+  }
+  profileModal.classList.remove("hidden");
 };
 async function imageToDataURL(file){
   if(!file)return null;
@@ -968,6 +1038,10 @@ $("saveProfile").onclick=async()=>{
 
     await updateDoc(doc(db,"users",currentUser.uid),update);
     await loadMyProfile();
+    const freshProfile=await getDoc(doc(db,"users",currentUser.uid));
+    const freshData=freshProfile.data()||{};
+    renderAvatar(profilePhotoPreview,freshData.photoURL,freshData.name);
+    if(freshData.photoURL)profilePhotoPreview.onclick=()=>openProfileImage(freshData.photoURL,freshData.name);
     profileModal.classList.add("hidden");
     toastMsg(photoURL?"Profile photo updated":"Profile updated");
   }catch(e){
@@ -1422,7 +1496,7 @@ async function initIncomingCalls(){
       incomingCallData=d;
       incomingCallName.textContent=d.callerName||"User";
       incomingCallType.textContent=d.type==="video"?"📹 Incoming video call":"📞 Incoming voice call";
-      incomingCallAvatar.textContent=getInitials(d.callerName||"User");
+      renderAvatar(incomingCallAvatar,d.callerPhotoURL,d.callerName||"User");
       incomingCallModal.classList.remove("hidden");
     });
   },e=>console.warn("Incoming calls:",e));
