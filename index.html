@@ -799,7 +799,7 @@ $("notifyBtn").onclick=async()=>{
   if(!messaging||!VAPID_KEY)return toastMsg("Add your Firebase Web Push VAPID key in the code first.");
   try{
     const permission=await Notification.requestPermission();if(permission!=="granted")return toastMsg("Notification permission denied.");
-   const reg=await navigator.serviceWorker.register("./firebase-messaging-sw.js",{scope:"./firebase-messaging/"});;
+   const reg = await navigator.serviceWorker.ready;notificationToken = await getToken(messaging, {vapidKey: VAPID_KEY,serviceWorkerRegistration: reg});
     notificationToken=await getToken(messaging,{vapidKey:VAPID_KEY,serviceWorkerRegistration:reg});
     await updateDoc(doc(db,"users",currentUser.uid),{fcmTokens:arrayUnion(notificationToken)});
     toastMsg("Browser notifications enabled");
