@@ -50,7 +50,23 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
 .check-list{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:10px}.check-item{padding:11px;display:flex;gap:10px;align-items:center;border-bottom:1px solid var(--line)}.check-item:last-child{border-bottom:0}
 .theme-light{--bg:#edf2f8;--panel:#fff;--panel2:#f3f6fb;--line:rgba(15,25,45,.12);--text:#142033;--muted:#607089;--bubble:#e6ebf3}.theme-light body{background:#edf2f8}.theme-light .sidebar,.theme-light .chat-header,.theme-light .composer{background:rgba(255,255,255,.9)}.theme-light .input,.theme-light .search,.theme-light .message-input,.theme-light .small-btn,.theme-light .icon-btn{background:#fff;color:#142033}.theme-light .message.received{background:#e3e9f2}.theme-light .file-card a{color:#142033}
 @media(max-width:800px){.sidebar{width:100%}.chat{display:none}.app.chat-open .sidebar{display:none}.app.chat-open .chat{display:flex}.mobile-back{display:block}.message-wrap{max-width:88%}.chat-tools{display:none}.composer{padding:7px 8px;gap:4px}.message-input{min-width:0;font-size:13px!important;padding:10px 12px!important}.send{width:42px;min-width:42px;height:42px;font-size:17px}.message{font-size:13px;padding:8px 10px}.message-time{font-size:9px}}
-.group-actions{margin-left:auto;display:flex;gap:4px}.group-actions button{border:0;background:#111a29;color:#aebbd0;border-radius:7px;padding:5px 7px;cursor:pointer}.group-actions button:hover{background:#1f2b40;color:#fff}.user{display:flex;align-items:center}</style>
+.group-actions{margin-left:auto;display:flex;gap:4px}.group-actions button{border:0;background:#111a29;color:#aebbd0;border-radius:7px;padding:5px 7px;cursor:pointer}.group-actions button:hover{background:#1f2b40;color:#fff}.user{display:flex;align-items:center}.group-settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.group-photo-picker{text-align:center;margin-bottom:14px}
+.group-photo-preview{width:84px;height:84px;border-radius:50%;margin:0 auto 9px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--cyan),var(--purple));font-weight:900;font-size:28px;overflow:hidden}
+.group-photo-preview img{width:100%;height:100%;object-fit:cover}
+.group-member-row{padding:10px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line)}
+.group-member-row:last-child{border-bottom:0}
+.group-member-meta{flex:1;min-width:0}
+.group-role{font-size:11px;color:#8490a5;margin-top:2px}
+.group-member-actions{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+.group-member-actions button{border:1px solid var(--line);background:#111927;color:#cbd4e3;border-radius:7px;padding:5px 7px;font-size:11px;cursor:pointer}
+.group-member-actions button:hover{background:#1f2b40;color:#fff}
+.permission-list{border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:10px}
+.permission-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 2px}
+.permission-row span{font-size:12px;color:#cbd4e3}
+.group-settings-scroll{max-height:55vh;overflow:auto;padding-right:2px}
+@media(max-width:600px){.group-settings-grid{grid-template-columns:1fr}.modal-card{padding:16px}.group-member-actions{width:100%;justify-content:flex-start}}
+</style>
 </head>
 <body>
 
@@ -101,6 +117,7 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
       </div>
       <div class="chat-tools">
         <button class="icon-btn" id="searchMessagesBtn" title="Search messages">🔎</button>
+        <button class="icon-btn hidden" id="groupSettingsBtn" title="Group settings">⚙️</button>
       </div>
     </header>
     <div class="messages" id="messages"><div class="empty">Select a user to start chatting 💬</div></div>
@@ -141,6 +158,38 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
     <input class="input" id="messageSearchInput" placeholder="Search loaded messages...">
     <div id="messageSearchResults" style="max-height:320px;overflow:auto;color:#aeb9cb"></div>
     <div class="modal-actions"><button class="small-btn" data-close="searchModal">Close</button></div>
+  </div>
+</div>
+
+<div class="modal hidden" id="groupSettingsModal">
+  <div class="modal-card">
+    <div class="modal-title">👥 Group Settings</div>
+    <div class="group-settings-scroll">
+      <div class="group-photo-picker">
+        <div class="group-photo-preview" id="groupPhotoPreview">G</div>
+        <input type="file" id="groupPhotoInput" accept="image/*" style="max-width:100%">
+      </div>
+
+      <input class="input" id="groupSettingsName" placeholder="Group name" maxlength="50">
+      <textarea class="input" id="groupDescription" placeholder="Group description" maxlength="200" style="min-height:80px;resize:vertical"></textarea>
+
+      <div class="modal-title" style="font-size:15px;margin-top:8px">⚙️ Admin permissions</div>
+      <div class="permission-list">
+        <label class="permission-row"><span>Members can add people</span><input type="checkbox" id="permAddMembers"></label>
+        <label class="permission-row"><span>Admins can remove people</span><input type="checkbox" id="permRemoveMembers" checked></label>
+        <label class="permission-row"><span>Admins can edit group info</span><input type="checkbox" id="permEditInfo" checked></label>
+      </div>
+
+      <div class="modal-title" style="font-size:15px;margin-top:16px">👥 Members</div>
+      <div class="check-list" id="groupMembersList"></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="small-btn" id="leaveGroupBtn" style="color:#ff667d">🚪 Leave</button>
+      <button class="small-btn" id="inviteGroupBtn">🔗 Invite</button>
+      <button class="small-btn" data-close="groupSettingsModal">Close</button>
+      <button class="small-btn" id="saveGroupSettings">Save</button>
+    </div>
   </div>
 </div>
 
@@ -199,6 +248,12 @@ const chatStatus=$("chatStatus"),chatUsername=$("chatUsername"),logoutBtn=$("log
 const typingIndicator=$("typingIndicator"),replyBar=$("replyBar"),replyText=$("replyText"),cancelReply=$("cancelReply");
 const fileInput=$("fileInput"),attachBtn=$("attachBtn"),recordBtn=$("recordBtn"),toast=$("toast");
 const profileModal=$("profileModal"),groupModal=$("groupModal"),searchModal=$("searchModal");
+const groupSettingsModal=$("groupSettingsModal"),groupSettingsBtn=$("groupSettingsBtn");
+const groupMembersList=$("groupMembersList"),groupSettingsName=$("groupSettingsName");
+const groupDescription=$("groupDescription"),groupPhotoInput=$("groupPhotoInput");
+const groupPhotoPreview=$("groupPhotoPreview"),leaveGroupBtn=$("leaveGroupBtn");
+const inviteGroupBtn=$("inviteGroupBtn"),saveGroupSettings=$("saveGroupSettings");
+const permAddMembers=$("permAddMembers"),permRemoveMembers=$("permRemoveMembers"),permEditInfo=$("permEditInfo");
 
 let isRegister=false,currentUser=null,selectedUser=null,selectedChat=null,unsubscribeMessages=null,unsubscribeChat=null,unsubscribeTyping=null;
 let allUsers=[],loadedMessages=[],replyingTo=null,typingTimer=null,mediaRecorder=null,voiceChunks=[],isRecording=false;
@@ -364,6 +419,166 @@ function getInitials(n){return(n||"U").split(/\s+/).map(x=>x[0]).join("").slice(
 function esc(v){const d=document.createElement("div");d.textContent=v??"";return d.innerHTML}
 function escAttr(v){return esc(v).replace(/"/g,"&quot;")}
 
+
+function isGroupAdmin(groupData,uid=currentUser?.uid){
+  if(!groupData||!uid)return false;
+  return groupData.createdBy===uid || (groupData.admins||[]).includes(uid);
+}
+function isGroupCreator(groupData,uid=currentUser?.uid){
+  return !!groupData && groupData.createdBy===uid;
+}
+function groupPermission(groupData,key){
+  if(!groupData)return false;
+  if(isGroupCreator(groupData))return true;
+  if(!isGroupAdmin(groupData))return false;
+  const p=groupData.permissions||{};
+  if(key==="addMembers")return p.addMembers!==false;
+  if(key==="removeMembers")return p.removeMembers!==false;
+  if(key==="editInfo")return p.editInfo!==false;
+  return false;
+}
+async function getGroupData(groupId){
+  const s=await getDoc(doc(db,"chats",groupId));
+  return s.exists()?{id:groupId,...s.data()}:null;
+}
+async function syncGroupIndex(groupId,data){
+  try{
+    await setDoc(doc(db,"groupIndex",groupId),{
+      chatId:groupId,
+      name:data.name||"Group",
+      description:data.description||"",
+      photoURL:data.photoURL||null,
+      participants:data.participants||[],
+      createdBy:data.createdBy,
+      admins:data.admins||[],
+      archivedBy:data.archivedBy||{},
+      permissions:data.permissions||{},
+      updatedAt:serverTimestamp()
+    },{merge:true});
+  }catch(e){console.warn("Group index sync:",e.message)}
+}
+async function openGroupSettings(group){
+  if(!group?.isGroup)return;
+  try{
+    const data=await getGroupData(group.id);
+    if(!data)return toastMsg("Group not found.");
+    groupSettingsName.value=data.name||group.name||"";
+    groupDescription.value=data.description||"";
+    permAddMembers.checked=!!data.permissions?.addMembers;
+    permRemoveMembers.checked=data.permissions?.removeMembers!==false;
+    permEditInfo.checked=data.permissions?.editInfo!==false;
+    renderGroupPhotoPreview(data);
+    renderGroupMembers(data);
+    const admin=isGroupAdmin(data);
+    const creator=isGroupCreator(data);
+    groupSettingsName.disabled=!groupPermission(data,"editInfo");
+    groupDescription.disabled=!groupPermission(data,"editInfo");
+    groupPhotoInput.disabled=!groupPermission(data,"editInfo");
+    permAddMembers.disabled=!creator;
+    permRemoveMembers.disabled=!creator;
+    permEditInfo.disabled=!creator;
+    saveGroupSettings.classList.toggle("hidden",!groupPermission(data,"editInfo")&&!creator);
+    groupSettingsModal.classList.remove("hidden");
+  }catch(e){
+    console.error("Group settings:",e);
+    toastMsg("Group settings failed: "+e.message);
+  }
+}
+function renderGroupPhotoPreview(data){
+  if(data?.photoURL){
+    groupPhotoPreview.innerHTML=`<img src="${escAttr(data.photoURL)}" alt="">`;
+  }else{
+    groupPhotoPreview.textContent=getInitials(data?.name||"Group");
+  }
+}
+async function renderGroupMembers(data){
+  groupMembersList.innerHTML="";
+  const ids=[...new Set(data.participants||[])];
+  for(const uid of ids){
+    const snap=await getDoc(doc(db,"users",uid));
+    if(!snap.exists())continue;
+    const u=snap.data();
+    const creator=uid===data.createdBy;
+    const admin=(data.admins||[]).includes(uid);
+    const row=document.createElement("div");
+    row.className="group-member-row";
+    const role=creator?"👑 Admin":admin?"🛡️ Co-admin":"👤 Member";
+    row.innerHTML=`<div class="user-avatar" style="width:38px;height:38px"></div>
+      <div class="group-member-meta"><strong>${esc(u.name||"User")}</strong>
+      <div style="color:#00eaff;font-size:11px">${esc(displayUsername(u))}</div>
+      <div class="group-role">${role}</div></div>
+      <div class="group-member-actions"></div>`;
+    renderAvatar(row.querySelector(".user-avatar"),u.photoURL,u.name);
+    const actions=row.querySelector(".group-member-actions");
+
+    if(uid!==currentUser.uid && !creator && isGroupAdmin(data)){
+      if(isGroupCreator(data)){
+        const roleBtn=document.createElement("button");
+        roleBtn.textContent=admin?"Remove admin":"Make co-admin";
+        roleBtn.onclick=()=>changeGroupAdmin(data,uid,!admin);
+        actions.appendChild(roleBtn);
+      }
+      if(groupPermission(data,"removeMembers")){
+        const removeBtn=document.createElement("button");
+        removeBtn.textContent="Remove";
+        removeBtn.onclick=()=>removeGroupMember(data,uid);
+        actions.appendChild(removeBtn);
+      }
+    }
+    groupMembersList.appendChild(row);
+  }
+  if(!ids.length)groupMembersList.innerHTML='<div style="padding:15px;color:#8490a5">No members.</div>';
+}
+async function changeGroupAdmin(data,uid,makeAdmin){
+  if(!isGroupCreator(data))return toastMsg("Only the group creator can manage co-admins.");
+  try{
+    const admins=new Set(data.admins||[]);
+    if(makeAdmin)admins.add(uid);else admins.delete(uid);
+    admins.add(data.createdBy);
+    const update={admins:[...admins],updatedAt:serverTimestamp()};
+    await updateDoc(doc(db,"chats",data.id),update);
+    await syncGroupIndex(data.id,{...data,...update,updatedAt:undefined});
+    toastMsg(makeAdmin?"Co-admin added":"Co-admin removed");
+    const fresh=await getGroupData(data.id);renderGroupMembers(fresh);
+  }catch(e){console.error(e);toastMsg("Admin update failed: "+e.message)}
+}
+async function removeGroupMember(data,uid){
+  if(!groupPermission(data,"removeMembers"))return toastMsg("You don't have permission to remove members.");
+  if(uid===data.createdBy)return toastMsg("The group creator cannot be removed.");
+  if(!confirm("Remove this member from the group?"))return;
+  try{
+    const participants=(data.participants||[]).filter(x=>x!==uid);
+    const admins=(data.admins||[]).filter(x=>x!==uid);
+    const update={participants,admins,updatedAt:serverTimestamp()};
+    await updateDoc(doc(db,"chats",data.id),update);
+    await syncGroupIndex(data.id,{...data,...update,updatedAt:undefined});
+    toastMsg("Member removed");
+    const fresh=await getGroupData(data.id);renderGroupMembers(fresh);
+    loadGroupIndex();
+  }catch(e){console.error(e);toastMsg("Remove failed: "+e.message)}
+}
+async function addGroupMembers(data){
+  if(!groupPermission(data,"addMembers"))return toastMsg("You don't have permission to add members.");
+  const existing=new Set(data.participants||[]);
+  const available=allUsers.filter(u=>!u.isGroup&&!existing.has(u.id));
+  if(!available.length)return toastMsg("No users available to add.");
+  const choices=available.map(u=>`${u.name||"User"} (@${u.username||""})`).join("\n");
+  const raw=prompt("Enter username(s) to add, separated by commas:\n\n"+choices);
+  if(!raw)return;
+  const names=raw.split(",").map(x=>normalizeUsername(x)).filter(Boolean);
+  const matches=available.filter(u=>names.includes(normalizeUsername(u.username)));
+  if(!matches.length)return toastMsg("No matching usernames found.");
+  const participants=[...existing,...matches.map(u=>u.id)];
+  try{
+    const update={participants,updatedAt:serverTimestamp()};
+    await updateDoc(doc(db,"chats",data.id),update);
+    await syncGroupIndex(data.id,{...data,...update,updatedAt:undefined});
+    toastMsg(`${matches.length} member${matches.length>1?"s":""} added`);
+    const fresh=await getGroupData(data.id);renderGroupMembers(fresh);
+    loadGroupIndex();
+  }catch(e){console.error(e);toastMsg("Add members failed: "+e.message)}
+}
+
 async function openChat(user,element){
   selectedUser=user;
   selectedChat=null;
@@ -375,6 +590,7 @@ async function openChat(user,element){
   chatUsername.textContent=user.isGroup?"":displayUsername(user);
   renderAvatar(chatAvatar,user.photoURL,user.name);
   chatStatus.textContent=user.isGroup?"Group":(user.online?"● Online":lastSeen(user.lastSeen));
+  groupSettingsBtn.classList.toggle("hidden",!user.isGroup);
 
   if(unsubscribeMessages)unsubscribeMessages();
   if(unsubscribeTyping)unsubscribeTyping();
@@ -397,7 +613,7 @@ async function openChat(user,element){
     };
 
     await setDoc(doc(db,"chats",chatId),chatData,{merge:true});
-    selectedChat={id:chatId,...chatData};
+    selectedChat={id:chatId,...chatData,...(user.isGroup?{groupId:chatId}:{}),};
     messageInput.disabled=false;
     sendBtn.disabled=false;
     app.classList.add("chat-open");
@@ -687,16 +903,25 @@ $("createGroup").onclick=async()=>{
     const c=await addDoc(collection(db,"chats"),{
       type:"group",
       name,
+      description:"",
+      photoURL:null,
       participants,
       createdBy:currentUser.uid,
       admins:[currentUser.uid],
       archivedBy:{},
+      permissions:{
+        addMembers:true,
+        removeMembers:true,
+        editInfo:true
+      },
       createdAt:serverTimestamp(),
       typing:{}
     });
     await setDoc(doc(db,"groupIndex",c.id),{
-      chatId:c.id,name,participants,createdBy:currentUser.uid,
-      admins:[currentUser.uid],archivedBy:{},createdAt:serverTimestamp()
+      chatId:c.id,name,description:"",photoURL:null,participants,createdBy:currentUser.uid,
+      admins:[currentUser.uid],archivedBy:{},
+      permissions:{addMembers:true,removeMembers:true,editInfo:true},
+      createdAt:serverTimestamp()
     });
     groupModal.classList.add("hidden");
     toastMsg("Group created");
@@ -717,6 +942,7 @@ async function archiveGroup(group){
     }catch(_){}
     if(selectedChat?.id===group.id){
       selectedChat=null;
+      groupSettingsBtn.classList.add("hidden");
       chatName.textContent="Select a user";
       chatStatus.textContent="Start a conversation";
       messages.innerHTML='<div class="empty">Group archived.</div>';
@@ -744,6 +970,7 @@ async function deleteGroup(group){
 
     if(selectedChat?.id===group.id){
       selectedChat=null;
+      groupSettingsBtn.classList.add("hidden");
       chatName.textContent="Select a user";
       chatStatus.textContent="Start a conversation";
       messages.innerHTML='<div class="empty">Group deleted.</div>';
@@ -783,9 +1010,107 @@ function renderSearchResults(term){
   const box=$("messageSearchResults");const arr=loadedMessages.filter(d=>(d.text||d.fileName||"").toLowerCase().includes(term));
   box.innerHTML=arr.length?arr.map(d=>`<div style="padding:10px;border-bottom:1px solid var(--line)">${esc(d.text||d.fileName||"Attachment")}</div>`).join(""):"No matches.";
 }
+
+groupSettingsBtn.onclick=()=>openGroupSettings(selectedUser);
+
+saveGroupSettings.onclick=async()=>{
+  if(!selectedUser?.isGroup)return;
+  try{
+    const data=await getGroupData(selectedUser.id);
+    if(!data)return toastMsg("Group not found.");
+    if(!groupPermission(data,"editInfo"))return toastMsg("You don't have permission to edit group info.");
+
+    const name=groupSettingsName.value.trim();
+    const description=groupDescription.value.trim();
+    if(!name)return toastMsg("Enter group name.");
+
+    let photoURL=data.photoURL||null;
+    const f=groupPhotoInput.files?.[0];
+    if(f){
+      photoURL=await imageToDataURL(f);
+    }
+
+    const permissions={
+      addMembers:permAddMembers.checked,
+      removeMembers:permRemoveMembers.checked,
+      editInfo:permEditInfo.checked
+    };
+
+    const update={name,description,photoURL,permissions,updatedAt:serverTimestamp()};
+    await updateDoc(doc(db,"chats",data.id),update);
+    await syncGroupIndex(data.id,{...data,...update,updatedAt:undefined});
+
+    selectedUser={...selectedUser,name,description,photoURL,permissions};
+    chatName.textContent=name;
+    renderAvatar(chatAvatar,photoURL,name);
+    groupPhotoInput.value="";
+    groupSettingsModal.classList.add("hidden");
+    toastMsg("Group settings saved");
+    loadGroupIndex();
+  }catch(e){
+    console.error("Save group settings:",e);
+    toastMsg("Save failed: "+(e.message||"Unknown error"));
+  }
+};
+
+leaveGroupBtn.onclick=async()=>{
+  if(!selectedUser?.isGroup)return;
+  const data=await getGroupData(selectedUser.id);
+  if(!data)return toastMsg("Group not found.");
+  if(data.createdBy===currentUser.uid)return toastMsg("Creator cannot leave. Transfer ownership first.");
+  if(!confirm(`Leave "${data.name||"this group"}"?`))return;
+  try{
+    const participants=(data.participants||[]).filter(x=>x!==currentUser.uid);
+    const admins=(data.admins||[]).filter(x=>x!==currentUser.uid);
+    await updateDoc(doc(db,"chats",data.id),{participants,admins,updatedAt:serverTimestamp()});
+    await syncGroupIndex(data.id,{...data,participants,admins,updatedAt:undefined});
+    groupSettingsModal.classList.add("hidden");
+    selectedUser=null;selectedChat=null;
+    app.classList.remove("chat-open");
+    groupSettingsBtn.classList.add("hidden");
+    chatName.textContent="Select a user";
+    chatUsername.textContent="";
+    chatStatus.textContent="Start a conversation";
+    messages.innerHTML='<div class="empty">Select a user to start chatting 💬</div>';
+    messageInput.disabled=true;sendBtn.disabled=true;
+    loadGroupIndex();
+    toastMsg("You left the group");
+  }catch(e){console.error(e);toastMsg("Leave failed: "+e.message)}
+};
+
+inviteGroupBtn.onclick=async()=>{
+  if(!selectedUser?.isGroup)return;
+  const inviteUrl=`${location.origin}${location.pathname}?group=${encodeURIComponent(selectedUser.id)}`;
+  try{
+    if(navigator.share){
+      await navigator.share({title:"Join my ShaanChat group",text:`Join ${selectedUser.name||"our group"} on ShaanChat`,url:inviteUrl});
+    }else{
+      await navigator.clipboard.writeText(inviteUrl);
+      toastMsg("Group invite link copied");
+    }
+  }catch(e){
+    if(e.name!=="AbortError"){
+      try{await navigator.clipboard.writeText(inviteUrl);toastMsg("Invite link copied");}
+      catch(_){prompt("Copy this group invite link:",inviteUrl)}
+    }
+  }
+};
+
+const addMembersBtn=document.createElement("button");
+addMembersBtn.className="small-btn";
+addMembersBtn.textContent="➕ Add members";
+addMembersBtn.id="addGroupMembersBtn";
+groupSettingsModal.querySelector(".modal-actions").insertBefore(addMembersBtn,groupSettingsModal.querySelector("[data-close='groupSettingsModal']"));
+addMembersBtn.onclick=async()=>{
+  if(!selectedUser?.isGroup)return;
+  const data=await getGroupData(selectedUser.id);
+  if(data)await addGroupMembers(data);
+};
+
 $("themeBtn").onclick=()=>{document.documentElement.classList.toggle("theme-light");localStorage.setItem("shaanTheme",document.documentElement.classList.contains("theme-light")?"light":"dark")};
 if(localStorage.getItem("shaanTheme")==="light")document.documentElement.classList.add("theme-light");
 backBtn.onclick=()=>app.classList.remove("chat-open");
+window.addEventListener("load",()=>groupSettingsBtn.classList.add("hidden"));
 logoutBtn.onclick=async()=>{await setPresence(false);await signOut(auth)};
 
 document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>$(b.dataset.close).classList.add("hidden"));
