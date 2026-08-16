@@ -66,23 +66,6 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
 .permission-row span{font-size:12px;color:#cbd4e3}
 .group-settings-scroll{max-height:55vh;overflow:auto;padding-right:2px}
 @media(max-width:600px){.group-settings-grid{grid-template-columns:1fr}.modal-card{padding:16px}.group-member-actions{width:100%;justify-content:flex-start}}
-/* ===== PROFILE IMAGE VIEWER FIX ===== */
-.profile-avatar-click{cursor:pointer;transition:transform .18s ease,filter .18s ease}
-.profile-avatar-click:hover{transform:scale(1.04);filter:brightness(1.08)}
-.profile-image-modal{position:fixed;inset:0;background:rgba(0,0,0,.88);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px}
-.profile-image-card{position:relative;max-width:min(92vw,720px);max-height:90vh;text-align:center}
-.profile-image-large{display:block;max-width:min(92vw,720px);max-height:78vh;width:auto;height:auto;object-fit:contain;border-radius:18px;border:1px solid rgba(255,255,255,.14);box-shadow:0 25px 90px rgba(0,0,0,.6);background:#0b111d}
-.profile-image-name{margin-top:12px;color:#fff;font-weight:800;font-size:16px}
-.profile-image-close{position:absolute;right:-8px;top:-14px;width:40px;height:40px;border:1px solid rgba(255,255,255,.15);border-radius:50%;background:#111927;color:#fff;font-size:20px;cursor:pointer;z-index:2}
-.profile-photo-preview{width:96px;height:96px;margin:0 auto 12px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--cyan),var(--purple));font-weight:900;font-size:30px;color:#fff;cursor:pointer}
-.profile-photo-preview img{width:100%;height:100%;object-fit:cover}
-.profile-photo-hint{text-align:center;color:#8490a5;font-size:11px;margin:-3px 0 12px}
-@media(max-width:600px){
-  .profile-image-card{max-width:96vw}
-  .profile-image-large{max-width:96vw;max-height:72vh;border-radius:14px}
-  .profile-image-close{right:0;top:-48px}
-}
-
 
 /* ===== STEP 10: Voice / Video Calls ===== */
 .call-actions{display:flex;gap:7px;margin-left:auto}
@@ -106,7 +89,7 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
 .call-control-bar{display:flex;justify-content:center;gap:10px;margin-top:15px;flex-wrap:wrap}
 .call-control{width:48px;height:48px;border:1px solid var(--line);border-radius:50%;background:#111927;color:#fff;cursor:pointer;font-size:18px}
 .call-control.end{background:#e94b68}
-.call-status-text{color:#9da8bb;margin-top:7px;font-size:13px}.call-timer{font-size:12px;color:#48e6a1;margin-top:5px;font-variant-numeric:tabular-nums}
+.call-status-text{color:#9da8bb;margin-top:7px;font-size:13px}
 @media(max-width:600px){
   .call-card{max-width:calc(100vw - 20px);padding:18px}
   .active-call-card{height:calc(100vh - 20px);display:flex;flex-direction:column}
@@ -187,8 +170,6 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
 <div class="modal hidden" id="profileModal">
   <div class="modal-card">
     <div class="modal-title">Profile</div>
-    <div class="profile-photo-preview profile-avatar-click" id="profilePhotoPreview">U</div>
-    <div class="profile-photo-hint">Tap your photo to view it</div>
     <input class="input" id="profileName" placeholder="Name">
     <input class="input" id="profileUsername" placeholder="Username (e.g. shaan123)" maxlength="20">
     <input type="file" class="input" id="profilePhoto" accept="image/*">
@@ -264,7 +245,7 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
 <div class="call-modal hidden" id="activeCallModal">
   <div class="call-card active-call-card">
     <div class="call-title" id="activeCallName">Call</div>
-    <div class="call-status-text" id="activeCallStatus">Connecting…</div><div class="call-timer" id="callTimer">00:00</div>
+    <div class="call-status-text" id="activeCallStatus">Connecting…</div>
     <div class="video-stage hidden" id="videoStage">
       <video class="remote-video" id="remoteVideo" autoplay playsinline></video>
       <video class="local-video" id="localVideo" autoplay muted playsinline></video>
@@ -279,15 +260,6 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
       <button class="call-control" id="speakerCallBtn" title="Speaker">🔊</button>
       <button class="call-control end" id="endCallBtn" title="End call">📞</button>
     </div>
-  </div>
-</div>
-
-
-<div class="profile-image-modal hidden" id="profileImageModal">
-  <div class="profile-image-card">
-    <button class="profile-image-close" id="closeProfileImage" aria-label="Close">✕</button>
-    <img class="profile-image-large" id="profileImageLarge" alt="Profile photo">
-    <div class="profile-image-name" id="profileImageName"></div>
   </div>
 </div>
 
@@ -346,9 +318,6 @@ const chatStatus=$("chatStatus"),chatUsername=$("chatUsername"),logoutBtn=$("log
 const typingIndicator=$("typingIndicator"),replyBar=$("replyBar"),replyText=$("replyText"),cancelReply=$("cancelReply");
 const fileInput=$("fileInput"),attachBtn=$("attachBtn"),recordBtn=$("recordBtn"),toast=$("toast");
 const profileModal=$("profileModal"),groupModal=$("groupModal"),searchModal=$("searchModal");
-const profilePhotoPreview=$("profilePhotoPreview"),profileImageModal=$("profileImageModal"),
-      profileImageLarge=$("profileImageLarge"),profileImageName=$("profileImageName"),
-      closeProfileImage=$("closeProfileImage");
 const groupSettingsModal=$("groupSettingsModal"),groupSettingsBtn=$("groupSettingsBtn");
 const groupMembersList=$("groupMembersList"),groupSettingsName=$("groupSettingsName");
 const groupDescription=$("groupDescription"),groupPhotoInput=$("groupPhotoInput");
@@ -359,7 +328,7 @@ const voiceCallBtn=$("voiceCallBtn"),videoCallBtn=$("videoCallBtn");
 const incomingCallModal=$("incomingCallModal"),incomingCallAvatar=$("incomingCallAvatar"),incomingCallName=$("incomingCallName"),incomingCallType=$("incomingCallType");
 const acceptIncomingBtn=$("acceptIncomingBtn"),rejectIncomingBtn=$("rejectIncomingBtn");
 const activeCallModal=$("activeCallModal"),activeCallName=$("activeCallName"),activeCallStatus=$("activeCallStatus");
-const activeCallAvatar=$("activeCallAvatar"),audioCallLabel=$("audioCallLabel"),videoStage=$("videoStage"),audioCallVisual=$("audioCallVisual"),callTimerEl=$("callTimer");
+const activeCallAvatar=$("activeCallAvatar"),audioCallLabel=$("audioCallLabel"),videoStage=$("videoStage"),audioCallVisual=$("audioCallVisual");
 const remoteVideo=$("remoteVideo"),localVideo=$("localVideo"),muteCallBtn=$("muteCallBtn"),cameraCallBtn=$("cameraCallBtn"),speakerCallBtn=$("speakerCallBtn"),endCallBtn=$("endCallBtn");
 
 let isRegister=false,currentUser=null,selectedUser=null,selectedChat=null,unsubscribeMessages=null,unsubscribeChat=null,unsubscribeTyping=null;
@@ -370,7 +339,8 @@ let messaging=null,notificationToken=null;
 let peerConnection=null,localStream=null,currentCallId=null,currentCallType=null,currentCallRole=null;
 let unsubscribeIncomingCalls=null,unsubscribeCallDoc=null,unsubscribeCallerCandidates=null,unsubscribeCalleeCandidates=null;
 let incomingCallData=null;
-let callStartedAt=0,callTimer=null,callTimeoutTimer=null;
+let callDocReady=false;
+let pendingIceCandidates=[];
 const rtcConfig={iceServers:[
   {urls:"stun:stun.l.google.com:19302"},
   {urls:"stun:stun1.l.google.com:19302"}
@@ -530,37 +500,8 @@ function renderUser(user){
 }
 function lastSeen(ts){if(!ts?.toDate)return"Offline";return"Last seen "+formatTime(ts.toDate())}
 function renderAvatar(el,url,name){
-  if(!el)return;
-  el.classList.add("profile-avatar-click");
-  el.dataset.photoUrl=url||"";
-  el.dataset.photoName=name||"User";
-  if(url){
-    el.innerHTML=`<img src="${escAttr(url)}" alt="${escAttr(name||"Profile photo")}">`;
-    el.onclick=()=>openProfileImage(url,name);
-  }else{
-    el.innerHTML="";
-    el.textContent=getInitials(name);
-    el.onclick=null;
-  }
+  if(url)el.innerHTML=`<img src="${escAttr(url)}" alt="">`;else el.textContent=getInitials(name);
 }
-function openProfileImage(url,name){
-  if(!url)return toastMsg("This user has no profile photo.");
-  profileImageLarge.src=url;
-  profileImageLarge.alt=(name||"User")+" profile photo";
-  profileImageName.textContent=name||"User";
-  profileImageModal.classList.remove("hidden");
-}
-function closeProfileImageViewer(){
-  profileImageModal.classList.add("hidden");
-  profileImageLarge.removeAttribute("src");
-}
-closeProfileImage.onclick=closeProfileImageViewer;
-profileImageModal.onclick=e=>{
-  if(e.target===profileImageModal || e.target===profileImageLarge)closeProfileImageViewer();
-};
-document.addEventListener("keydown",e=>{
-  if(e.key==="Escape"&&!profileImageModal.classList.contains("hidden"))closeProfileImageViewer();
-});
 function getInitials(n){return(n||"U").split(/\s+/).map(x=>x[0]).join("").slice(0,2).toUpperCase()}
 function esc(v){const d=document.createElement("div");d.textContent=v??"";return d.innerHTML}
 function escAttr(v){return esc(v).replace(/"/g,"&quot;")}
@@ -986,17 +927,7 @@ async function uploadVoice(blob){
 }
 
 $("profileBtn").onclick=async()=>{
-  const s=await getDoc(doc(db,"users",currentUser.uid));
-  const d=s.data()||{};
-  $("profileName").value=d.name||"";
-  profileUsername.value=d.username||"";
-  renderAvatar(profilePhotoPreview,d.photoURL,d.name);
-  if(d.photoURL){
-    profilePhotoPreview.onclick=()=>openProfileImage(d.photoURL,d.name);
-  }else{
-    profilePhotoPreview.onclick=()=>toastMsg("No profile photo uploaded yet.");
-  }
-  profileModal.classList.remove("hidden");
+  const s=await getDoc(doc(db,"users",currentUser.uid));const d=s.data()||{};$("profileName").value=d.name||"";profileUsername.value=d.username||"";profileModal.classList.remove("hidden");
 };
 async function imageToDataURL(file){
   if(!file)return null;
@@ -1039,10 +970,6 @@ $("saveProfile").onclick=async()=>{
 
     await updateDoc(doc(db,"users",currentUser.uid),update);
     await loadMyProfile();
-    const freshProfile=await getDoc(doc(db,"users",currentUser.uid));
-    const freshData=freshProfile.data()||{};
-    renderAvatar(profilePhotoPreview,freshData.photoURL,freshData.name);
-    if(freshData.photoURL)profilePhotoPreview.onclick=()=>openProfileImage(freshData.photoURL,freshData.name);
     profileModal.classList.add("hidden");
     toastMsg(photoURL?"Profile photo updated":"Profile updated");
   }catch(e){
@@ -1288,7 +1215,6 @@ function clearCallListeners(){
 }
 
 function resetCallUI(){
-  clearInterval(callTimer);callTimer=null;clearTimeout(callTimeoutTimer);callTimeoutTimer=null;callStartedAt=0;if(callTimerEl)callTimerEl.textContent="00:00";
   incomingCallModal.classList.add("hidden");
   activeCallModal.classList.add("hidden");
   videoStage.classList.add("hidden");
@@ -1305,8 +1231,8 @@ async function cleanupCall(deleteDocToo=true){
   try{peerConnection?.close()}catch(_){}
   peerConnection=null;
   if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null}
-  currentCallId=null;currentCallType=null;currentCallRole=null;incomingCallData=null;
-  stopCallTimer();resetCallUI();
+  currentCallId=null;currentCallType=null;currentCallRole=null;incomingCallData=null;callDocReady=false;pendingIceCandidates=[];
+  resetCallUI();
   if(deleteDocToo && callId){
     try{await deleteDoc(doc(db,"calls",callId))}catch(_){}
   }
@@ -1319,19 +1245,6 @@ async function getCallMedia(type){
     video:type==="video"?{facingMode:"user",width:{ideal:1280},height:{ideal:720}}:false
   });
 }
-
-function startCallTimer(){
-  clearInterval(callTimer);
-  callStartedAt=Date.now();
-  const tick=()=>{
-    const sec=Math.floor((Date.now()-callStartedAt)/1000);
-    const m=String(Math.floor(sec/60)).padStart(2,"0");
-    const s=String(sec%60).padStart(2,"0");
-    if(callTimerEl)callTimerEl.textContent=`${m}:${s}`;
-  };
-  tick();callTimer=setInterval(tick,1000);
-}
-function stopCallTimer(){clearInterval(callTimer);callTimer=null;}
 
 function showActiveCall(type,name,userData){
   activeCallName.textContent=name||"Call";
@@ -1348,6 +1261,22 @@ function showActiveCall(type,name,userData){
   activeCallModal.classList.remove("hidden");
 }
 
+async function writeIceCandidate(callId,role,candidate){
+  const sub=role==="caller"?"callerCandidates":"calleeCandidates";
+  try{
+    await addDoc(collection(db,"calls",callId,sub),candidate);
+  }catch(err){
+    console.warn("ICE candidate:",err);
+  }
+}
+
+async function flushPendingIceCandidates(callId){
+  const pending=pendingIceCandidates.splice(0);
+  for(const item of pending){
+    await writeIceCandidate(callId,item.role,item.candidate);
+  }
+}
+
 function setupPeerConnection(callId,role,type,remoteId){
   peerConnection=new RTCPeerConnection(rtcConfig);
 
@@ -1360,7 +1289,7 @@ function setupPeerConnection(callId,role,type,remoteId){
 
   peerConnection.onconnectionstatechange=()=>{
     const state=peerConnection.connectionState;
-    if(state==="connected"){activeCallStatus.textContent="Connected";startCallTimer();}
+    if(state==="connected")activeCallStatus.textContent="Connected";
     if(state==="connecting")activeCallStatus.textContent="Connecting…";
     if(state==="disconnected"||state==="failed"){
       activeCallStatus.textContent="Call ended";
@@ -1370,10 +1299,12 @@ function setupPeerConnection(callId,role,type,remoteId){
 
   peerConnection.onicecandidate=async e=>{
     if(!e.candidate)return;
-    const sub=role==="caller"?"callerCandidates":"calleeCandidates";
-    try{
-      await addDoc(collection(db,"calls",callId,sub),e.candidate.toJSON());
-    }catch(err){console.warn("ICE candidate:",err)}
+    const candidate=e.candidate.toJSON();
+    if(!callDocReady){
+      pendingIceCandidates.push({role,candidate});
+      return;
+    }
+    await writeIceCandidate(callId,role,candidate);
   };
 
   return peerConnection;
@@ -1411,19 +1342,25 @@ async function startCall(type){
     await peerConnection.setLocalDescription(offer);
 
     await setDoc(callRef,{
-      callId,callerId:currentUser.uid,calleeId:selectedUser.id,
-      callerName:myName.textContent,callerPhotoURL:myAvatar.dataset.photoUrl||null,
-      type,status:"ringing",offer:{type:offer.type,sdp:offer.sdp},
+      callId,
+      callerId:currentUser.uid,
+      calleeId:selectedUser.id,
+      callerName:myName.textContent,
+      callerPhotoURL:myAvatar.dataset.photoUrl||null,
+      type,
+      status:"ringing",
+      offer:{type:offer.type,sdp:offer.sdp},
       createdAt:serverTimestamp()
     });
 
+    callDocReady=true;
+    await flushPendingIceCandidates(callId);
     listenRemoteCandidates(callId,"caller");
 
     unsubscribeCallDoc=onSnapshot(callRef,async snap=>{
       if(!snap.exists())return;
       const data=snap.data();
       if(data.status==="accepted" && data.answer && !peerConnection.currentRemoteDescription){
-        clearTimeout(callTimeoutTimer);
         await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
         activeCallStatus.textContent="Connecting…";
       }
@@ -1433,14 +1370,6 @@ async function startCall(type){
       }
     });
     activeCallStatus.textContent="Calling…";
-    clearTimeout(callTimeoutTimer);
-    callTimeoutTimer=setTimeout(async()=>{
-      if(currentCallId===callId){
-        try{await updateDoc(callRef,{status:"ended",endedAt:serverTimestamp()})}catch(_){}
-        await cleanupCall(false);
-        toastMsg("No answer");
-      }
-    },30000);
   }catch(e){
     console.error("Start call:",e);
     await cleanupCall(false);
@@ -1467,13 +1396,14 @@ async function acceptIncomingCall(){
     const answer=await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
 
-    clearTimeout(callTimeoutTimer);
     await updateDoc(doc(db,"calls",data.callId),{
       status:"accepted",
       answer:{type:answer.type,sdp:answer.sdp},
       acceptedAt:serverTimestamp()
     });
 
+    callDocReady=true;
+    await flushPendingIceCandidates(data.callId);
     listenRemoteCandidates(data.callId,"callee");
 
     unsubscribeCallDoc=onSnapshot(doc(db,"calls",data.callId),async snap=>{
@@ -1521,7 +1451,7 @@ async function initIncomingCalls(){
       incomingCallData=d;
       incomingCallName.textContent=d.callerName||"User";
       incomingCallType.textContent=d.type==="video"?"📹 Incoming video call":"📞 Incoming voice call";
-      renderAvatar(incomingCallAvatar,d.callerPhotoURL,d.callerName||"User");
+      incomingCallAvatar.textContent=getInitials(d.callerName||"User");
       incomingCallModal.classList.remove("hidden");
     });
   },e=>console.warn("Incoming calls:",e));
@@ -1551,8 +1481,14 @@ cameraCallBtn.onclick=()=>{
 
 speakerCallBtn.onclick=()=>{
   try{
-    remoteVideo.muted=!remoteVideo.muted;
-    speakerCallBtn.textContent=remoteVideo.muted?"🔇":"🔊";
+    if("setSinkId" in remoteVideo){
+      const muted=remoteVideo.muted;
+      remoteVideo.muted=!muted;
+      speakerCallBtn.textContent=remoteVideo.muted?"🔇":"🔊";
+    }else{
+      remoteVideo.muted=!remoteVideo.muted;
+      speakerCallBtn.textContent=remoteVideo.muted?"🔇":"🔊";
+    }
   }catch(_){}
 };
 
