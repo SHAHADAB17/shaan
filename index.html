@@ -734,6 +734,19 @@ $("notifyBtn").onclick=async()=>{
 function scrollMessages(){messages.scrollTop=messages.scrollHeight}
 function formatTime(date){return date.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}
 function toastMsg(text){toast.textContent=text;toast.classList.remove("hidden");clearTimeout(toast._t);toast._t=setTimeout(()=>toast.classList.add("hidden"),2800)}
+// ShaanChat PWA Service Worker
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("./service-worker.js")
+      .then(registration => {
+        console.log("ShaanChat Service Worker registered:", registration.scope);
+      })
+      .catch(error => {
+        console.error("Service Worker registration failed:", error);
+      });
+  });
+}
 </script>
 </body>
 </html>
