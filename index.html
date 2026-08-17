@@ -289,6 +289,43 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
   </div>
 </div>
 
+<div class="modal hidden" id="notificationModal">
+  <div class="modal-card settings-card">
+    <div class="settings-head">
+      <div>
+        <div class="modal-title" style="margin-bottom:4px">🔔 Notifications</div>
+        <div class="settings-subtitle">Control ShaanChat push notifications</div>
+      </div>
+      <button class="settings-close" id="closeNotificationSettings">✕</button>
+    </div>
+    <div class="permission-list">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+        <span style="font-size:12px;color:#cbd4e3">Browser permission</span>
+        <strong id="notificationPermissionStatus" style="color:#48e6a1">Checking…</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:10px">
+        <span style="font-size:12px;color:#cbd4e3">ShaanChat notifications</span>
+        <strong id="notificationSettingStatus" style="color:#48e6a1">OFF</strong>
+      </div>
+    </div>
+    <div class="settings-list" style="margin-top:10px">
+      <button class="settings-item" id="enableNotificationsBtn">
+        <span class="settings-icon">🔔</span>
+        <span class="settings-item-text"><strong>Enable notifications</strong><small>Allow new messages and incoming call alerts</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
+      <button class="settings-item settings-logout" id="disableNotificationsBtn">
+        <span class="settings-icon">🔕</span>
+        <span class="settings-item-text"><strong>Disable on this device</strong><small>Remove this browser's FCM token</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
+    </div>
+    <div style="margin-top:12px;color:#8490a5;font-size:11px;line-height:1.5">
+      Browser-level notification permissions are controlled by Chrome/your browser settings. ShaanChat cannot override a permission that you deny.
+    </div>
+  </div>
+</div>
+
 <div class="modal hidden" id="privacyModal"><div class="modal-card settings-card"><div class="settings-head"><div><div class="modal-title" style="margin-bottom:4px">🔐 Privacy & Security</div><div class="settings-subtitle">Control your privacy and account protection</div></div><button class="settings-close" id="closePrivacy">✕</button></div><div class="settings-list"><button class="settings-item" id="blockedUsersBtn"><span class="settings-icon">🚫</span><span class="settings-item-text"><strong>Blocked Users</strong><small>Block or unblock people</small></span><span class="settings-arrow">›</span></button><button class="settings-item" id="reportUserBtn"><span class="settings-icon">🚩</span><span class="settings-item-text"><strong>Report User</strong><small>Report spam or abuse</small></span><span class="settings-arrow">›</span></button><div class="permission-list"><div class="modal-title" style="font-size:15px;margin-bottom:6px">👁️ Last Seen</div><select class="input" id="lastSeenPrivacy"><option value="everyone">Everyone</option><option value="contacts">My Contacts</option><option value="nobody">Nobody</option></select><div class="modal-title" style="font-size:15px;margin-bottom:6px">🟢 Online Status</div><select class="input" id="onlinePrivacy"><option value="everyone">Everyone</option><option value="contacts">My Contacts</option><option value="nobody">Nobody</option></select></div><button class="settings-item" id="chatLockBtn"><span class="settings-icon">🔒</span><span class="settings-item-text"><strong>Chat Lock</strong><small>Lock or unlock the selected chat</small></span><span class="settings-arrow">›</span></button><button class="settings-item" id="appPinBtn"><span class="settings-icon">🔑</span><span class="settings-item-text"><strong>App Lock / PIN</strong><small>Set, change or remove your PIN</small></span><span class="settings-arrow">›</span></button><button class="settings-item" id="accountSecurityBtn"><span class="settings-icon">🛡️</span><span class="settings-item-text"><strong>Account Security</strong><small>Review email and send password reset</small></span><span class="settings-arrow">›</span></button><div class="modal-actions"><button class="small-btn" id="savePrivacy">Save privacy</button><button class="small-btn" id="donePrivacy">Done</button></div></div></div></div>
 
 <div class="modal hidden" id="chatSecurityModal"><div class="modal-card settings-card"><div class="settings-head"><div><div class="modal-title" style="margin-bottom:4px">⚙️ Chat Settings</div><div class="settings-subtitle">Privacy & actions for this chat</div></div><button class="settings-close" id="closeChatSecurity">✕</button></div><div class="settings-list"><button class="settings-item" id="chatBlockAction"><span class="settings-icon">🚫</span><span class="settings-item-text"><strong id="chatBlockActionTitle">Block User</strong><small id="chatBlockActionSub">Stop this user from contacting you</small></span><span class="settings-arrow">›</span></button><button class="settings-item" id="chatReportAction"><span class="settings-icon">🚩</span><span class="settings-item-text"><strong>Report User</strong><small>Report spam, abuse or unwanted behaviour</small></span><span class="settings-arrow">›</span></button><button class="settings-item" id="chatLockAction"><span class="settings-icon">🔒</span><span class="settings-item-text"><strong id="chatLockActionTitle">Chat Lock</strong><small id="chatLockActionSub">Lock or unlock this conversation</small></span><span class="settings-arrow">›</span></button></div></div></div>
@@ -452,6 +489,7 @@ const typingIndicator=$("typingIndicator"),replyBar=$("replyBar"),replyText=$("r
 const fileInput=$("fileInput"),attachBtn=$("attachBtn"),recordBtn=$("recordBtn"),toast=$("toast");
 const profileModal=$("profileModal"),groupModal=$("groupModal"),searchModal=$("searchModal");
 const privacyModal=$("privacyModal"),lastSeenPrivacy=$("lastSeenPrivacy"),onlinePrivacy=$("onlinePrivacy");
+const notificationModal=$("notificationModal"),notificationPermissionStatus=$("notificationPermissionStatus"),notificationSettingStatus=$("notificationSettingStatus");
 const profilePhotoPreview=$("profilePhotoPreview"),profileImageModal=$("profileImageModal"),
       profileImageLarge=$("profileImageLarge"),profileImageName=$("profileImageName"),
       closeProfileImage=$("closeProfileImage");
@@ -472,7 +510,7 @@ const remoteVideo=$("remoteVideo"),localVideo=$("localVideo"),muteCallBtn=$("mut
 
 let isRegister=false,currentUser=null,selectedUser=null,selectedChat=null,unsubscribeMessages=null,unsubscribeChat=null,unsubscribeTyping=null;
 let allUsers=[],loadedMessages=[],replyingTo=null,typingTimer=null,mediaRecorder=null,voiceChunks=[],isRecording=false;
-let messaging=null,notificationToken=null;
+let messaging=null,notificationToken=null,notificationSettingsEnabled=false,pendingNotificationRoute=null;
 
 // WebRTC call state
 let peerConnection=null,localStream=null,currentCallId=null,currentCallType=null,currentCallRole=null;
@@ -600,10 +638,19 @@ authBtn.onclick=async()=>{
   }catch(e){console.error(e);authError.textContent=e.message;}
 };
 
+function readNotificationRoute(){
+  const params=new URLSearchParams(location.search);
+  const chat=params.get("chat");
+  const call=params.get("call");
+  if(chat || call) pendingNotificationRoute={chat,call};
+}
+readNotificationRoute();
+
 onAuthStateChanged(auth,async user=>{
   if(user){
     currentUser=user;authScreen.style.display="none";app.classList.add("show");
-    await ensureUserProfile();await setPresence(true);await loadMyProfile();listenUsers();loadGroupIndex();initNotifications();initIncomingCalls();appLockChecked=false;await showAppLockIfEnabled();
+    await ensureUserProfile();await setPresence(true);await loadMyProfile();listenUsers();loadGroupIndex();initNotifications();initIncomingCalls();await loadNotificationSettings();appLockChecked=false;await showAppLockIfEnabled();
+    setTimeout(processNotificationRoute,700);
   }else{
     currentUser=null;app.classList.remove("show");authScreen.style.display="flex";
   }
@@ -663,6 +710,7 @@ function listenUsers(){
     const groups=allUsers.filter(x=>x.isGroup);
     allUsers=[...people,...groups];
     renderUsers(allUsers);
+    processNotificationRoute();
   });
 }
 let peopleHidden = localStorage.getItem("shaanHidePeople") === "1";
@@ -1999,20 +2047,116 @@ window.onclick=e=>{
   if(e.target.classList.contains("modal"))e.target.classList.add("hidden");
 };
 
-async function initNotifications(){
-  if(!("Notification"in window)||!await isSupported().catch(()=>false))return;
-  try{messaging=getMessaging(firebaseApp);onMessage(messaging,p=>toastMsg(p.notification?.title||"New message"))}catch(e){console.warn("FCM unavailable",e)}
-}
-$("notifyBtn").onclick=async()=>{
-  if(!messaging||!VAPID_KEY)return toastMsg("Add your Firebase Web Push VAPID key in the code first.");
+async function loadNotificationSettings(){
+  if(!currentUser)return;
   try{
-    const permission=await Notification.requestPermission();if(permission!=="granted")return toastMsg("Notification permission denied.");
-   const reg = await navigator.serviceWorker.ready;notificationToken = await getToken(messaging, {vapidKey: VAPID_KEY,serviceWorkerRegistration: reg});
-    notificationToken=await getToken(messaging,{vapidKey:VAPID_KEY,serviceWorkerRegistration:reg});
-    await updateDoc(doc(db,"users",currentUser.uid),{fcmTokens:arrayUnion(notificationToken)});
-    toastMsg("Browser notifications enabled");
-  }catch(e){console.error(e);toastMsg("Notifications setup failed: "+e.message)}
+    const s=await getDoc(doc(db,"users",currentUser.uid));
+    notificationSettingsEnabled=s.data()?.notificationSettings?.enabled===true;
+  }catch(e){notificationSettingsEnabled=false}
+  updateNotificationSettingsUI();
+}
+
+function updateNotificationSettingsUI(){
+  const permission=("Notification"in window)?Notification.permission:"unsupported";
+  if(notificationPermissionStatus){
+    notificationPermissionStatus.textContent=
+      permission==="granted"?"Granted":permission==="denied"?"Blocked":"Not requested";
+    notificationPermissionStatus.style.color=permission==="granted"?"#48e6a1":permission==="denied"?"#ff667d":"#f6c85f";
+  }
+  if(notificationSettingStatus){
+    notificationSettingStatus.textContent=notificationSettingsEnabled?"ON":"OFF";
+    notificationSettingStatus.style.color=notificationSettingsEnabled?"#48e6a1":"#8490a5";
+  }
+}
+
+async function initNotifications(){
+  if(!("Notification"in window)||!await isSupported().catch(()=>false)){
+    console.warn("FCM/Web Notifications are not supported in this browser.");
+    return;
+  }
+  try{
+    messaging=getMessaging(firebaseApp);
+    onMessage(messaging,p=>{
+      const data=p?.data||{};
+      const title=p?.notification?.title||data.title||"ShaanChat";
+      const body=p?.notification?.body||data.body||"New notification";
+      toastMsg(`${title}: ${body}`);
+    });
+  }catch(e){console.warn("FCM unavailable",e)}
+}
+
+async function enableNotifications(){
+  if(!currentUser)return;
+  if(!messaging||!VAPID_KEY)return toastMsg("FCM is not available. Check your VAPID key.");
+  if(!("Notification"in window))return toastMsg("This browser does not support notifications.");
+  try{
+    const permission=await Notification.requestPermission();
+    updateNotificationSettingsUI();
+    if(permission!=="granted")return toastMsg("Notification permission denied. Allow notifications in browser settings.");
+    notificationToken=await getToken(messaging,{vapidKey:VAPID_KEY});
+    if(!notificationToken)throw new Error("FCM token was not created.");
+    await updateDoc(doc(db,"users",currentUser.uid),{
+      fcmTokens:arrayUnion(notificationToken),
+      notificationSettings:{enabled:true,updatedAt:serverTimestamp()},
+      updatedAt:serverTimestamp()
+    });
+    notificationSettingsEnabled=true;
+    updateNotificationSettingsUI();
+    toastMsg("🔔 Notifications enabled");
+  }catch(e){
+    console.error("Enable notifications:",e);
+    toastMsg("Notifications setup failed: "+(e.message||"Unknown error"));
+  }
+}
+
+async function disableNotifications(){
+  if(!currentUser)return;
+  try{
+    if(notificationToken){
+      await updateDoc(doc(db,"users",currentUser.uid),{
+        fcmTokens:arrayRemove(notificationToken),
+        updatedAt:serverTimestamp()
+      });
+    }
+    await updateDoc(doc(db,"users",currentUser.uid),{
+      "notificationSettings.enabled":false,
+      "notificationSettings.updatedAt":serverTimestamp(),
+      updatedAt:serverTimestamp()
+    });
+    notificationToken=null;
+    notificationSettingsEnabled=false;
+    updateNotificationSettingsUI();
+    toastMsg("🔕 Notifications disabled on this device");
+  }catch(e){
+    console.error("Disable notifications:",e);
+    toastMsg("Could not disable notifications: "+(e.message||"Unknown error"));
+  }
+}
+
+function processNotificationRoute(){
+  if(!currentUser||!pendingNotificationRoute||!allUsers.length)return;
+  const route=pendingNotificationRoute;
+  if(route.chat){
+    const target=allUsers.find(u=>u.id===route.chat||u.chatId===route.chat);
+    if(target){
+      pendingNotificationRoute=null;
+      const dummy=document.createElement("div");
+      openChat(target,dummy);
+    }
+  }
+  if(route.call){
+    pendingNotificationRoute=null;
+  }
+}
+
+$("notifyBtn").onclick=async()=>{
+  await loadNotificationSettings();
+  updateNotificationSettingsUI();
+  notificationModal.classList.remove("hidden");
 };
+$("closeNotificationSettings").onclick=()=>notificationModal.classList.add("hidden");
+$("enableNotificationsBtn").onclick=enableNotifications;
+$("disableNotificationsBtn").onclick=disableNotifications;
 
 function scrollMessages(){messages.scrollTop=messages.scrollHeight}
 function formatTime(date){return date.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}
