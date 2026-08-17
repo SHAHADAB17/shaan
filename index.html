@@ -78,7 +78,7 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
   .settings-item{min-height:64px;padding:10px}
   .settings-item-text small{font-size:10px}
 }
-.group-actions{margin-left:auto;display:flex;gap:4px}.group-actions button{border:0;background:#111a29;color:#aebbd0;border-radius:7px;padding:5px 7px;cursor:pointer}.group-actions button:hover{background:#1f2b40;color:#fff}.user{display:flex;align-items:center}.group-settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#createGroup:disabled{opacity:.55;cursor:wait}.group-actions{margin-left:auto;display:flex;gap:4px}.group-actions button{border:0;background:#111a29;color:#aebbd0;border-radius:7px;padding:5px 7px;cursor:pointer}.group-actions button:hover{background:#1f2b40;color:#fff}.user{display:flex;align-items:center}.group-settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .group-photo-picker{text-align:center;margin-bottom:14px}
 .group-photo-preview{width:84px;height:84px;border-radius:50%;margin:0 auto 9px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--cyan),var(--purple));font-weight:900;font-size:28px;overflow:hidden}
 .group-photo-preview img{width:100%;height:100%;object-fit:cover}
@@ -157,183 +157,6 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
 .privacy-user-list{max-height:280px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:10px}.privacy-user-row{display:flex;align-items:center;gap:10px;padding:10px;border-bottom:1px solid var(--line)}.privacy-user-row:last-child{border-bottom:0}.privacy-user-row .user-info{flex:1}.privacy-mini-btn{border:1px solid var(--line);background:#111927;color:#cbd4e3;border-radius:8px;padding:7px 9px;cursor:pointer;font-size:11px}.theme-light .privacy-mini-btn{background:#fff;color:#142033}
 /* MOBILE CHAT SECURITY + APP LOCK */
 #chatSecurityBtn{font-size:18px}.app-lock-screen{position:fixed;inset:0;background:rgba(3,7,15,.97);backdrop-filter:blur(18px);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}.app-lock-card{width:100%;max-width:360px;background:#0d1421;border:1px solid var(--line);border-radius:22px;padding:25px;text-align:center;box-shadow:0 30px 100px rgba(0,0,0,.65)}.app-lock-icon{font-size:42px;margin-bottom:8px}.app-lock-card h2{margin-bottom:6px}.app-lock-card p{color:#8490a5;font-size:12px;margin-bottom:18px}.app-lock-input{width:100%;padding:13px;border:1px solid var(--line);border-radius:12px;background:#070b14;color:#fff;text-align:center;font-size:22px;letter-spacing:.25em;outline:none}.app-lock-error{min-height:18px;color:#ff667d;font-size:12px;margin-top:9px}.app-lock-btn{width:100%;margin-top:12px;padding:12px;border:0;border-radius:12px;background:linear-gradient(135deg,var(--cyan),var(--purple));color:#fff;font-weight:800;cursor:pointer}@media(max-width:600px){#chatSecurityBtn{display:block!important}.chat-tools{gap:4px}.chat-tools .icon-btn{width:35px;height:35px}.settings-card{max-height:88vh;overflow:auto}}
-
-/* =========================================================
-   SHAANCHAT PRO — POLISHED UI / MOTION PACK
-   ========================================================= */
-:root{
-  --shadow-lg:0 30px 90px rgba(0,0,0,.42);
-  --shadow-md:0 14px 40px rgba(0,0,0,.28);
-  --glass:rgba(13,20,33,.72);
-  --glass-strong:rgba(13,20,33,.9);
-  --focus:rgba(0,234,255,.28);
-}
-html{scroll-behavior:smooth}
-body{overflow:hidden;isolation:isolate}
-body::before,body::after{
-  content:"";position:fixed;z-index:-2;pointer-events:none;border-radius:50%;
-  filter:blur(50px);opacity:.34;animation:orbFloat 12s ease-in-out infinite alternate;
-}
-body::before{width:340px;height:340px;left:-120px;top:8%;background:rgba(0,234,255,.16)}
-body::after{width:420px;height:420px;right:-150px;bottom:-120px;background:rgba(124,60,255,.18);animation-delay:-5s}
-.auth-screen{
-  position:relative;overflow:hidden;
-  background:
-    radial-gradient(circle at 50% 20%,rgba(0,234,255,.08),transparent 32%),
-    radial-gradient(circle at 50% 100%,rgba(124,60,255,.10),transparent 36%);
-}
-.auth-screen::before{
-  content:"";position:absolute;inset:-50%;pointer-events:none;
-  background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),
-                   linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);
-  background-size:42px 42px;transform:perspective(500px) rotateX(55deg) translateY(18%);
-  mask-image:linear-gradient(to bottom,transparent,black 30%,black 75%,transparent);
-  animation:gridDrift 18s linear infinite;
-}
-.auth-box{
-  position:relative;z-index:1;
-  animation:authEnter .7s cubic-bezier(.2,.8,.2,1);
-  border-color:rgba(0,234,255,.14);
-}
-.auth-box::after{
-  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
-  background:linear-gradient(120deg,transparent 20%,rgba(255,255,255,.06) 45%,transparent 70%);
-  transform:translateX(-120%);animation:glassSweep 7s ease-in-out infinite;
-}
-.logo{letter-spacing:-.04em;text-shadow:0 0 25px rgba(0,234,255,.15)}
-.input,.search,.message-input{
-  transition:border-color .2s,box-shadow .2s,background .2s,transform .2s;
-}
-.input:hover,.search:hover,.message-input:hover{border-color:rgba(255,255,255,.16)}
-.input:focus,.search:focus,.message-input:focus{
-  box-shadow:0 0 0 4px var(--focus),0 0 28px rgba(0,234,255,.07);
-  transform:translateY(-1px);
-}
-.auth-main-btn,.send{
-  position:relative;overflow:hidden;transition:transform .18s,box-shadow .18s,filter .18s;
-}
-.auth-main-btn:hover,.send:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 12px 30px rgba(0,234,255,.16);filter:saturate(1.15)}
-.auth-main-btn:active,.send:active:not(:disabled){transform:scale(.97)}
-.auth-main-btn::before,.send::before{
-  content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 25%,rgba(255,255,255,.28),transparent 75%);
-  transform:translateX(-130%);animation:buttonShine 4.8s ease-in-out infinite;
-}
-.app.show{animation:appEnter .45s ease both}
-.sidebar,.chat-header,.composer{
-  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
-}
-.sidebar{box-shadow:12px 0 40px rgba(0,0,0,.08)}
-.brand{transition:transform .25s}.brand:hover{transform:translateX(2px)}
-.me .avatar,.chat-avatar,.user-avatar{transition:transform .22s,box-shadow .22s,filter .22s}
-.me .avatar:hover,.chat-avatar:hover,.user:hover .user-avatar{
-  transform:scale(1.055);box-shadow:0 0 0 3px rgba(0,234,255,.09),0 0 22px rgba(0,234,255,.08);filter:brightness(1.06)
-}
-.user{
-  position:relative;overflow:hidden;
-  transition:background .2s,transform .2s,padding-left .2s;
-}
-.user::after{
-  content:"";position:absolute;left:0;top:0;bottom:0;width:2px;
-  background:linear-gradient(var(--cyan),var(--purple));transform:scaleY(0);transition:transform .2s;
-}
-.user:hover{transform:translateX(2px);padding-left:20px}.user:hover::after,.user.active::after{transform:scaleY(1)}
-.user.active{box-shadow:inset 0 0 30px rgba(0,234,255,.035)}
-.presence-dot.online{animation:presencePulse 2.2s ease-in-out infinite}
-.messages{
-  scroll-behavior:smooth;
-  scrollbar-width:thin;scrollbar-color:rgba(0,234,255,.28) transparent;
-}
-.messages::-webkit-scrollbar,.users::-webkit-scrollbar{width:7px}
-.messages::-webkit-scrollbar-thumb,.users::-webkit-scrollbar-thumb{background:rgba(0,234,255,.20);border-radius:99px}
-.message-wrap{animation:messageIn .32s cubic-bezier(.2,.8,.2,1) both}
-.message-wrap.sent{transform-origin:right bottom}.message-wrap.received{transform-origin:left bottom}
-.message{
-  transition:transform .16s,box-shadow .16s,filter .16s;
-}
-.message:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(0,0,0,.14)}
-.message-actions{animation:actionPop .16s ease both}
-.send{box-shadow:0 7px 20px rgba(0,234,255,.10)}
-.send:not(:disabled){animation:sendReady 2.8s ease-in-out infinite}
-.attach,.icon-btn,.small-btn,.settings-item,.call-btn,.call-control{
-  transition:transform .18s,background .18s,border-color .18s,box-shadow .18s,color .18s;
-}
-.attach:hover,.icon-btn:hover,.small-btn:hover,.call-control:hover{transform:translateY(-2px);border-color:rgba(0,234,255,.28);box-shadow:0 8px 22px rgba(0,0,0,.18)}
-.attach:active,.icon-btn:active,.small-btn:active,.settings-item:active,.call-btn:active,.call-control:active{transform:scale(.95)}
-.typing{transition:opacity .2s;animation:typingFade 1.4s ease-in-out infinite}
-.reply-bar{animation:slideUp .2s ease both;box-shadow:0 -10px 30px rgba(0,0,0,.12)}
-.modal{
-  animation:modalBg .2s ease both;
-}
-.modal:not(.hidden) .modal-card{
-  animation:modalCardIn .28s cubic-bezier(.2,.8,.2,1) both;
-}
-.modal-card{
-  box-shadow:var(--shadow-lg);
-  background:linear-gradient(145deg,rgba(15,23,38,.96),rgba(9,15,26,.96));
-}
-.modal-title{letter-spacing:-.02em}
-.settings-item{
-  position:relative;overflow:hidden;
-}
-.settings-item::after{
-  content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent,rgba(255,255,255,.05),transparent);
-  transform:translateX(-120%);transition:transform .55s;
-}
-.settings-item:hover::after{transform:translateX(120%)}
-.profile-photo-preview,.group-photo-preview,.call-avatar{
-  box-shadow:0 0 0 1px rgba(255,255,255,.08),0 14px 35px rgba(0,0,0,.22);
-}
-.call-modal{animation:modalBg .22s ease both}
-.call-modal:not(.hidden) .call-card{animation:callIn .35s cubic-bezier(.2,.8,.2,1) both}
-.incoming-call-pulse{animation:incomingPulse 1.25s ease-in-out infinite,callGlow 2s ease-in-out infinite}
-.app-lock-screen{animation:modalBg .22s ease both}
-.app-lock-screen:not(.hidden) .app-lock-card{animation:lockIn .35s cubic-bezier(.2,.8,.2,1) both}
-.toast{
-  animation:toastIn .3s cubic-bezier(.2,.8,.2,1) both;
-  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
-}
-.toast.hidden{animation:toastOut .2s ease both}
-.theme-light body{background:#edf2f8}
-.theme-light .modal-card{background:rgba(255,255,255,.97)}
-.theme-light .toast{background:rgba(255,255,255,.96);color:#142033}
-.theme-light .message.sent{color:#fff}
-@keyframes authEnter{from{opacity:0;transform:translateY(22px) scale(.97)}to{opacity:1;transform:none}}
-@keyframes appEnter{from{opacity:0}to{opacity:1}}
-@keyframes orbFloat{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(35px,-22px,0) scale(1.08)}}
-@keyframes gridDrift{from{transform:perspective(500px) rotateX(55deg) translateY(18%) translateX(0)}to{transform:perspective(500px) rotateX(55deg) translateY(18%) translateX(42px)}}
-@keyframes glassSweep{0%,55%{transform:translateX(-120%)}72%,100%{transform:translateX(120%)}}
-@keyframes buttonShine{0%,65%{transform:translateX(-130%)}82%,100%{transform:translateX(130%)}}
-@keyframes presencePulse{0%,100%{box-shadow:0 0 0 0 rgba(44,230,141,.15)}50%{box-shadow:0 0 0 5px rgba(44,230,141,0)}}
-@keyframes messageIn{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
-@keyframes actionPop{from{opacity:0;transform:translateY(4px) scale(.96)}to{opacity:1;transform:none}}
-@keyframes sendReady{0%,100%{box-shadow:0 7px 20px rgba(0,234,255,.10)}50%{box-shadow:0 9px 27px rgba(0,234,255,.20)}}
-@keyframes typingFade{0%,100%{opacity:.55}50%{opacity:1}}
-@keyframes slideUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-@keyframes modalBg{from{opacity:0}to{opacity:1}}
-@keyframes modalCardIn{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
-@keyframes callIn{from{opacity:0;transform:translateY(24px) scale(.94)}to{opacity:1;transform:none}}
-@keyframes callGlow{50%{box-shadow:0 0 0 8px rgba(0,234,255,.04),0 0 45px rgba(0,234,255,.18)}}
-@keyframes lockIn{from{opacity:0;transform:scale(.94) translateY(10px)}to{opacity:1;transform:none}}
-@keyframes toastIn{from{opacity:0;transform:translateY(14px) scale(.96)}to{opacity:1;transform:none}}
-@keyframes toastOut{from{opacity:1}to{opacity:0;transform:translateY(8px)}}
-@media (prefers-reduced-motion:reduce){
-  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.001ms!important}
-}
-@media(max-width:800px){
-  .sidebar{box-shadow:none}
-  .chat-header{padding:10px 11px}
-  .messages{padding:14px 10px}
-  .message-wrap{max-width:86%}
-  .message-actions{top:-39px}
-}
-
-
-.sc-ripple{position:absolute;width:8px;height:8px;border-radius:50%;pointer-events:none;
-  background:rgba(255,255,255,.35);transform:translate(-50%,-50%) scale(1);
-  animation:scRipple .52s ease-out forwards;z-index:9}
-.icon-btn,.small-btn,.settings-item,.auth-main-btn,.send,.call-btn,.call-control{position:relative;overflow:hidden}
-.chat-ready{box-shadow:inset 0 -1px 0 rgba(0,234,255,.06)}
-@keyframes scRipple{to{opacity:0;transform:translate(-50%,-50%) scale(24)}}
 </style>
 </head>
 <body>
@@ -749,7 +572,12 @@ function displayUsername(user){
   return user?.username ? "@"+user.username : "";
 }
 function userSearchText(user){
-  return [user?.name,user?.username,user?.email].filter(Boolean).join(" ").toLowerCase();
+  return [
+    user?.name,
+    user?.username,
+    user?.email,
+    user?.isGroup ? user?.description : ""
+  ].filter(Boolean).join(" ").toLowerCase();
 }
 
 authBtn.onclick=async()=>{
@@ -851,10 +679,16 @@ function listenUsers(){
   const q=query(collection(db,"users"));
   onSnapshot(q,snap=>{
     const people=[];
-    snap.forEach(x=>{if(x.id!==currentUser.uid)people.push({id:x.id,...x.data()})});
+    snap.forEach(x=>{
+      if(x.id!==currentUser.uid)people.push({id:x.id,...x.data()});
+    });
+
+    // Preserve the current group cache while the people snapshot updates.
     const groups=allUsers.filter(x=>x.isGroup);
     allUsers=[...people,...groups];
     renderUsers(allUsers);
+  },err=>{
+    console.warn("Users listener:",err.message);
   });
 }
 let peopleHidden = localStorage.getItem("shaanHidePeople") === "1";
@@ -1600,11 +1434,22 @@ $("groupBtn").onclick=()=>{
   groupModal.classList.remove("hidden");
 };
 $("createGroup").onclick=async()=>{
+  const btn=$("createGroup");
   const name=$("groupName").value.trim();
   const ids=[...document.querySelectorAll("#groupUsers input:checked")].map(x=>x.value);
-  if(!name||!ids.length)return toastMsg("Enter a group name and select users.");
+  if(!name||!ids.length){
+    return toastMsg("Enter a group name and select at least one user.");
+  }
+  if(!currentUser)return toastMsg("Please login again.");
+
+  btn.disabled=true;
+  const oldText=btn.textContent;
+  btn.textContent="Creating…";
+
   try{
     const participants=[...new Set([currentUser.uid,...ids])];
+
+    // Main group document.
     const c=await addDoc(collection(db,"chats"),{
       type:"group",
       name,
@@ -1620,18 +1465,66 @@ $("createGroup").onclick=async()=>{
         editInfo:true
       },
       createdAt:serverTimestamp(),
+      updatedAt:serverTimestamp(),
       typing:{}
     });
-    await setDoc(doc(db,"groupIndex",c.id),{
-      chatId:c.id,name,description:"",photoURL:null,participants,createdBy:currentUser.uid,
-      admins:[currentUser.uid],archivedBy:{},
-      permissions:{addMembers:true,removeMembers:true,editInfo:true},
-      createdAt:serverTimestamp()
-    });
+
+    // Lightweight index used by the sidebar.
+    const groupIndexData={
+      chatId:c.id,
+      name,
+      description:"",
+      photoURL:null,
+      participants,
+      createdBy:currentUser.uid,
+      admins:[currentUser.uid],
+      archivedBy:{},
+      permissions:{
+        addMembers:true,
+        removeMembers:true,
+        editInfo:true
+      },
+      createdAt:serverTimestamp(),
+      updatedAt:serverTimestamp()
+    };
+    await setDoc(doc(db,"groupIndex",c.id),groupIndexData);
+
+    // IMPORTANT: immediately add the new group to the local sidebar.
+    // This fixes the "group created but not visible" issue even if the
+    // groupIndex query has a short delay or is temporarily unavailable.
+    const newGroup={
+      id:c.id,
+      chatId:c.id,
+      isGroup:true,
+      ...groupIndexData
+    };
+    allUsers=[
+      ...allUsers.filter(u=>!u.isGroup && u.id!==c.id),
+      ...allUsers.filter(u=>u.isGroup && u.id!==c.id),
+      newGroup
+    ];
+    renderUsers(allUsers);
+
+    // Close/reset modal only after both writes succeed.
+    $("groupName").value="";
+    document.querySelectorAll("#groupUsers input").forEach(x=>x.checked=false);
     groupModal.classList.add("hidden");
-    toastMsg("Group created");
-    loadGroupIndex();
-  }catch(e){toastMsg("Group create failed: "+e.message)}
+
+    toastMsg(`"${name}" created successfully`);
+
+    // Refresh from Firestore as a consistency check.
+    await loadGroupIndex();
+
+    // Open the newly-created group automatically.
+    const groupEl=usersList.querySelector(`[data-group-id="${c.id}"]`);
+    if(groupEl)groupEl.click();
+  }catch(e){
+    console.error("Group create failed:",e);
+    toastMsg("Group create failed: "+(e?.message||"Unknown error"));
+  }finally{
+    btn.disabled=false;
+    btn.textContent=oldText;
+  }
 };
 
 async function archiveGroup(group){
@@ -1692,17 +1585,30 @@ async function deleteGroup(group){
   }
 };
 async function loadGroupIndex(){
+  if(!currentUser)return;
   try{
-    const snap=await getDocs(query(collection(db,"groupIndex"),where("participants","array-contains",currentUser.uid)));const groups=[];
+    const snap=await getDocs(
+      query(collection(db,"groupIndex"),where("participants","array-contains",currentUser.uid))
+    );
+    const groups=[];
     snap.forEach(x=>{
-      const d=x.data();
+      const d=x.data()||{};
       if((d.participants||[]).includes(currentUser.uid)
          && !(d.archivedBy&&d.archivedBy[currentUser.uid])){
         groups.push({id:x.id,chatId:x.id,isGroup:true,...d});
       }
     });
-    allUsers=[...allUsers.filter(x=>!x.isGroup),...groups];renderUsers(allUsers);
-  }catch(e){console.warn("Group index:",e.message)}
+
+    // Keep the People list from the live users listener and replace only Groups.
+    const people=allUsers.filter(x=>!x.isGroup);
+    allUsers=[...people,...groups];
+    renderUsers(allUsers);
+  }catch(e){
+    // Do not erase an already-created group when groupIndex is temporarily
+    // unavailable (rules, network, or a short Firestore propagation delay).
+    console.warn("Group index:",e.message);
+    renderUsers(allUsers);
+  }
 }
 setInterval(()=>{if(currentUser)loadGroupIndex()},10000);
 
@@ -2227,49 +2133,6 @@ if ("serviceWorker" in navigator) {
       });
   });
 }
-
-/* =========================================================
-   SHAANCHAT PRO — POLISH / MICRO-INTERACTIONS
-   ========================================================= */
-(function(){
-  // Ripple feedback for interactive controls.
-  document.addEventListener("click",e=>{
-    const el=e.target.closest(".icon-btn,.small-btn,.settings-item,.auth-main-btn,.send,.call-btn,.call-control");
-    if(!el || el.disabled) return;
-    const rect=el.getBoundingClientRect();
-    const ripple=document.createElement("span");
-    ripple.className="sc-ripple";
-    ripple.style.left=(e.clientX-rect.left)+"px";
-    ripple.style.top=(e.clientY-rect.top)+"px";
-    el.appendChild(ripple);
-    setTimeout(()=>ripple.remove(),520);
-  },{passive:true});
-
-  // Keyboard polish: Enter sends, Shift+Enter keeps a new line.
-  messageInput.addEventListener("keydown",e=>{
-    if(e.key==="Enter" && !e.shiftKey){
-      e.preventDefault();
-      if(!sendBtn.disabled) sendBtn.click();
-    }
-  });
-
-  // Escape closes the top-most visible modal.
-  document.addEventListener("keydown",e=>{
-    if(e.key!=="Escape") return;
-    const visible=[...document.querySelectorAll(".modal:not(.hidden),.profile-image-modal:not(.hidden),.call-modal:not(.hidden),.app-lock-screen:not(.hidden)")];
-    const top=visible[visible.length-1];
-    if(top && top.id!=="appLockScreen") top.classList.add("hidden");
-  });
-
-  // Add subtle status animation to the header when a chat opens.
-  const observer=new MutationObserver(()=>{
-    if(chatName.textContent && chatName.textContent!=="Select a user"){
-      document.querySelector(".chat-header")?.classList.add("chat-ready");
-    }
-  });
-  observer.observe(chatName,{childList:true,characterData:true,subtree:true});
-})();
-
 </script>
 </body>
 </html>
