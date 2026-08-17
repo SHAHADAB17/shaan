@@ -341,6 +341,7 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
     <div class="modal-actions">
       <button class="small-btn" id="leaveGroupBtn" style="color:#ff667d">🚪 Leave</button>
       <button class="small-btn" id="inviteGroupBtn">🔗 Invite</button>
+      <button class="small-btn" id="groupInfoBtn">ℹ️ Info</button>
       <button class="small-btn" data-close="groupSettingsModal">Close</button>
       <button class="small-btn" id="saveGroupSettings">Save</button>
     </div>
@@ -413,7 +414,7 @@ import {
   getStorage, ref, uploadBytes, getDownloadURL
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-storage.js";
 import {
-  getMessaging, getToken, deleteToken, onMessage, isSupported
+  getMessaging, getToken, onMessage, isSupported
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-messaging.js";
 import {
   initializeAppCheck, ReCaptchaV3Provider
@@ -456,6 +457,7 @@ const profilePhotoPreview=$("profilePhotoPreview"),profileImageModal=$("profileI
       profileImageLarge=$("profileImageLarge"),profileImageName=$("profileImageName"),
       closeProfileImage=$("closeProfileImage");
 const groupSettingsModal=$("groupSettingsModal"),groupSettingsBtn=$("groupSettingsBtn"),blockUserBtn=$("blockUserBtn"),chatSecurityBtn=$("chatSecurityBtn");
+const groupInfoBtn=$("groupInfoBtn");
 const chatSecurityModal=$("chatSecurityModal"),chatBlockAction=$("chatBlockAction"),chatReportAction=$("chatReportAction"),chatLockAction=$("chatLockAction"),chatBlockActionTitle=$("chatBlockActionTitle"),chatBlockActionSub=$("chatBlockActionSub"),chatLockActionTitle=$("chatLockActionTitle"),chatLockActionSub=$("chatLockActionSub");
 const appLockModal=$("appLockModal"),appLockStatus=$("appLockStatus"),accountSecurityModal=$("accountSecurityModal"),securityEmail=$("securityEmail"),verifyEmailSub=$("verifyEmailSub");
 const groupMembersList=$("groupMembersList"),groupSettingsName=$("groupSettingsName");
@@ -600,10 +602,23 @@ authBtn.onclick=async()=>{
   }catch(e){console.error(e);authError.textContent=e.message;}
 };
 
+async function handleGroupInvite(){
+  try{
+    const groupId=new URLSearchParams(location.search).get("group"); if(!groupId||!currentUser)return;
+    const data=await getGroupData(groupId); if(!data||data.type!=="group")return toastMsg("Invalid or expired group invite.");
+    const participants=new Set(data.participants||[]);
+    if(participants.has(currentUser.uid)){toastMsg("You are already a member of this group."); history.replaceState({},document.title,location.pathname); return;}
+    if(!confirm(`Join "${data.name||"this group"}" on ShaanChat?`))return;
+    participants.add(currentUser.uid); const update={participants:[...participants],updatedAt:serverTimestamp()};
+    await updateDoc(doc(db,"chats",groupId),update); await syncGroupIndex(groupId,{...data,...update,updatedAt:undefined});
+    toastMsg(`Joined ${data.name||"the group"}`); await loadGroupIndex(); history.replaceState({},document.title,location.pathname);
+  }catch(e){console.error("Group invite:",e);toastMsg("Unable to join group: "+(e?.message||"Unknown error"));}
+}
+
 onAuthStateChanged(auth,async user=>{
   if(user){
     currentUser=user;authScreen.style.display="none";app.classList.add("show");
-    await ensureUserProfile();await setPresence(true);await loadMyProfile();listenUsers();loadGroupIndex();initNotifications();initIncomingCalls();appLockChecked=false;await showAppLockIfEnabled();
+    await ensureUserProfile();await setPresence(true);await loadMyProfile();listenUsers();await loadGroupIndex();await handleGroupInvite();initNotifications();initIncomingCalls();appLockChecked=false;await showAppLockIfEnabled();
   }else{
     currentUser=null;app.classList.remove("show");authScreen.style.display="flex";
   }
@@ -714,6 +729,7 @@ function renderUsers(users){
 }
 function renderUser(user){
   const div=document.createElement("div");div.className="user";
+  if(user.isGroup)div.dataset.groupId=user.id;
   const online=user.isGroup?true:!!user.online;
   div.innerHTML=`<div class="user-avatar"></div><div class="user-info">
     <div class="user-name">${esc(user.name||"User")}</div>
@@ -912,39 +928,36 @@ async function renderGroupMembers(data){
   groupMembersList.innerHTML="";
   const ids=[...new Set(data.participants||[])];
   for(const uid of ids){
-    const snap=await getDoc(doc(db,"users",uid));
-    if(!snap.exists())continue;
-    const u=snap.data();
-    const creator=uid===data.createdBy;
-    const admin=(data.admins||[]).includes(uid);
-    const row=document.createElement("div");
-    row.className="group-member-row";
+    const snap=await getDoc(doc(db,"users",uid)); if(!snap.exists())continue;
+    const u=snap.data(), creator=uid===data.createdBy, admin=(data.admins||[]).includes(uid), me=uid===currentUser.uid;
+    const row=document.createElement("div"); row.className="group-member-row";
     const role=creator?"👑 Admin":admin?"🛡️ Co-admin":"👤 Member";
-    row.innerHTML=`<div class="user-avatar" style="width:38px;height:38px"></div>
-      <div class="group-member-meta"><strong>${esc(u.name||"User")}</strong>
-      <div style="color:#00eaff;font-size:11px">${esc(displayUsername(u))}</div>
-      <div class="group-role">${role}</div></div>
-      <div class="group-member-actions"></div>`;
+    row.innerHTML=`<div class="user-avatar" style="width:38px;height:38px"></div><div class="group-member-meta"><strong>${esc(u.name||"User")}${me?" (You)":""}</strong><div style="color:#00eaff;font-size:11px">${esc(displayUsername(u))}</div><div class="group-role">${role}</div></div><div class="group-member-actions"></div>`;
     renderAvatar(row.querySelector(".user-avatar"),u.photoURL,u.name);
     const actions=row.querySelector(".group-member-actions");
-
-    if(uid!==currentUser.uid && !creator && isGroupAdmin(data)){
+    if(!me && !creator && isGroupAdmin(data)){
       if(isGroupCreator(data)){
-        const roleBtn=document.createElement("button");
-        roleBtn.textContent=admin?"Remove admin":"Make co-admin";
-        roleBtn.onclick=()=>changeGroupAdmin(data,uid,!admin);
-        actions.appendChild(roleBtn);
+        const roleBtn=document.createElement("button"); roleBtn.textContent=admin?"Remove admin":"Make co-admin"; roleBtn.onclick=()=>changeGroupAdmin(data,uid,!admin); actions.appendChild(roleBtn);
+        const transferBtn=document.createElement("button"); transferBtn.textContent="Transfer owner"; transferBtn.onclick=()=>transferGroupOwnership(data,uid,u.name||"this member"); actions.appendChild(transferBtn);
       }
-      if(groupPermission(data,"removeMembers")){
-        const removeBtn=document.createElement("button");
-        removeBtn.textContent="Remove";
-        removeBtn.onclick=()=>removeGroupMember(data,uid);
-        actions.appendChild(removeBtn);
-      }
+      if(groupPermission(data,"removeMembers")){const removeBtn=document.createElement("button"); removeBtn.textContent="Remove"; removeBtn.onclick=()=>removeGroupMember(data,uid); actions.appendChild(removeBtn);}
     }
     groupMembersList.appendChild(row);
   }
   if(!ids.length)groupMembersList.innerHTML='<div style="padding:15px;color:#8490a5">No members.</div>';
+}
+async function transferGroupOwnership(data,uid,name){
+  if(!isGroupCreator(data))return toastMsg("Only the group creator can transfer ownership.");
+  if(uid===currentUser.uid)return;
+  if(!confirm(`Transfer group ownership to ${name}? You will become a co-admin.`))return;
+  try{
+    const admins=new Set(data.admins||[]); admins.add(uid); admins.add(currentUser.uid);
+    const update={createdBy:uid,admins:[...admins],updatedAt:serverTimestamp()};
+    await updateDoc(doc(db,"chats",data.id),update); await syncGroupIndex(data.id,{...data,...update,updatedAt:undefined});
+    toastMsg("Group ownership transferred");
+    const fresh=await getGroupData(data.id); if(fresh)renderGroupMembers(fresh);
+    selectedUser={...selectedUser,createdBy:uid,admins:[...admins]}; loadGroupIndex();
+  }catch(e){console.error(e);toastMsg("Ownership transfer failed: "+(e?.message||"Unknown error"));}
 }
 async function changeGroupAdmin(data,uid,makeAdmin){
   if(!isGroupCreator(data))return toastMsg("Only the group creator can manage co-admins.");
@@ -1299,7 +1312,7 @@ const settingsModal=$("settingsModal");
 const privacySecurityBtn=$("privacySecurityBtn");
 async function loadPrivacySettings(){const s=await getDoc(doc(db,"users",currentUser.uid));const d=s.data()||{};lastSeenPrivacy.value=d.privacy?.lastSeen||"everyone";onlinePrivacy.value=d.privacy?.onlineStatus||"everyone";}
 async function savePrivacySettings(){try{await updateDoc(doc(db,"users",currentUser.uid),{privacy:{lastSeen:lastSeenPrivacy.value,onlineStatus:onlinePrivacy.value},updatedAt:serverTimestamp()});toastMsg("Privacy settings saved")}catch(e){toastMsg("Privacy save failed: "+e.message)}}
-async function toggleBlockUser(uid,block){await updateDoc(doc(db,"users",currentUser.uid),{blockedUsers:block?arrayUnion(uid):arrayRemove(uid),updatedAt:serverTimestamp()});await syncNotificationState()}
+async function toggleBlockUser(uid,block){await updateDoc(doc(db,"users",currentUser.uid),{blockedUsers:block?arrayUnion(uid):arrayRemove(uid),updatedAt:serverTimestamp()})}
 async function blockSelectedUser(){if(!selectedUser||selectedUser.isGroup)return toastMsg("Open a person chat first.");const me=await getDoc(doc(db,"users",currentUser.uid));const b=me.data()?.blockedUsers||[];const yes=b.includes(selectedUser.id);if(!yes&&!confirm(`Block ${selectedUser.name||"this user"}?`))return;try{await toggleBlockUser(selectedUser.id,!yes);toastMsg(yes?"User unblocked":"User blocked")}catch(e){toastMsg("Block update failed: "+e.message)}}
 async function openBlockedUsers(){const m=document.createElement("div");m.className="modal";const c=document.createElement("div");c.className="modal-card";c.innerHTML='<div class="modal-title">🚫 Blocked Users</div><div class="privacy-user-list" id="blockedList"></div><div class="modal-actions"><button class="small-btn" id="closeBlocked">Close</button></div>';m.appendChild(c);document.body.appendChild(m);const list=c.querySelector("#blockedList");const me=await getDoc(doc(db,"users",currentUser.uid));const ids=me.data()?.blockedUsers||[];if(!ids.length)list.innerHTML='<div style="padding:15px;color:#8490a5">No blocked users.</div>';for(const uid of ids){const us=await getDoc(doc(db,"users",uid));if(!us.exists())continue;const u=us.data();const row=document.createElement("div");row.className="privacy-user-row";row.innerHTML='<div class="user-avatar"></div><div class="user-info"><strong>'+esc(u.name||"User")+'</strong><div style="color:#00eaff;font-size:11px">'+esc(displayUsername(u))+'</div></div><button class="privacy-mini-btn">Unblock</button>';renderAvatar(row.querySelector(".user-avatar"),u.photoURL,u.name);row.querySelector("button").onclick=async()=>{await toggleBlockUser(uid,false);row.remove();toastMsg("User unblocked")};list.appendChild(row)}c.querySelector("#closeBlocked").onclick=()=>m.remove();m.onclick=e=>{if(e.target===m)m.remove()}}
 async function reportSelectedUser(){if(!selectedUser||selectedUser.isGroup)return toastMsg("Open a person chat first.");const reason=prompt("Reason for reporting this user:","Spam");if(!reason)return;try{await addDoc(collection(db,"reports"),{reporterId:currentUser.uid,reportedUserId:selectedUser.id,reportedUserName:selectedUser.name||"User",reason:reason.slice(0,500),status:"open",createdAt:serverTimestamp()});toastMsg("Report submitted")}catch(e){toastMsg("Report failed: "+e.message)}}
@@ -1531,6 +1544,13 @@ function renderSearchResults(term){
 }
 
 groupSettingsBtn.onclick=()=>openGroupSettings(selectedUser);
+groupInfoBtn.onclick=async()=>{
+  if(!selectedUser?.isGroup)return;
+  const data=await getGroupData(selectedUser.id); if(!data)return toastMsg("Group not found.");
+  const members=(data.participants||[]).length, admins=(data.admins||[]).length;
+  let owner="Group admin"; if(data.createdBy===currentUser.uid)owner="You"; else {const s=await getDoc(doc(db,"users",data.createdBy)); owner=s.data()?.name||owner;}
+  alert(`ShaanChat Group\n\nName: ${data.name||"Group"}\nDescription: ${data.description||"—"}\nMembers: ${members}\nAdmins: ${admins}\nOwner: ${owner}\n\nPermissions\n• Add members: ${data.permissions?.addMembers!==false?"ON":"OFF"}\n• Remove members: ${data.permissions?.removeMembers!==false?"ON":"OFF"}\n• Edit group info: ${data.permissions?.editInfo!==false?"ON":"OFF"}`);
+};
 
 saveGroupSettings.onclick=async()=>{
   if(!selectedUser?.isGroup)return;
@@ -1576,7 +1596,7 @@ leaveGroupBtn.onclick=async()=>{
   if(!selectedUser?.isGroup)return;
   const data=await getGroupData(selectedUser.id);
   if(!data)return toastMsg("Group not found.");
-  if(data.createdBy===currentUser.uid)return toastMsg("Creator cannot leave. Transfer ownership first.");
+  if(data.createdBy===currentUser.uid)return toastMsg("Creator cannot leave. Transfer ownership first from Members.");
   if(!confirm(`Leave "${data.name||"this group"}"?`))return;
   try{
     const participants=(data.participants||[]).filter(x=>x!==currentUser.uid);
@@ -1999,124 +2019,20 @@ window.onclick=e=>{
   if(e.target.classList.contains("modal"))e.target.classList.add("hidden");
 };
 
-async function syncNotificationState(){
-  if(!currentUser)return;
-  try{
-    const s=await getDoc(doc(db,"users",currentUser.uid));
-    const blocked=s.data()?.blockedUsers||[];
-    if(navigator.serviceWorker?.controller){
-      navigator.serviceWorker.controller.postMessage({type:"SHAAN_BLOCKED_USERS",blockedUsers:blocked});
-    }
-    const enabled=!!(s.data()?.fcmTokens||[]).length && Notification.permission==="granted";
-    const btn=$("notifyBtn");
-    if(btn){
-      const small=btn.querySelector("small");
-      if(small)small.textContent=enabled?"Notifications enabled — tap to manage":"Enable browser push notifications";
-    }
-  }catch(e){console.warn("Notification state:",e)}
-}
-
-async function showForegroundNotification(payload){
-  const n=payload?.notification||{};
-  const d=payload?.data||{};
-  const senderId=d.senderId||d.senderUid||"";
-  if(currentUser && senderId){
-    try{
-      const me=await getDoc(doc(db,"users",currentUser.uid));
-      if((me.data()?.blockedUsers||[]).includes(senderId))return;
-    }catch(e){}
-  }
-  const title=n.title||d.title||"ShaanChat";
-  const body=n.body||d.body||"New notification";
-  toastMsg(title+(body?" — "+body:""));
-  if(Notification.permission==="granted")new Notification(title,{body,icon:n.icon||d.icon||"./icon-192.png",badge:n.badge||"./icon-192.png",tag:d.tag||d.messageId||"shaanchat",data:d});
-}
-
 async function initNotifications(){
   if(!("Notification"in window)||!await isSupported().catch(()=>false))return;
-  try{
-    messaging=getMessaging(firebaseApp);
-    onMessage(messaging,payload=>showForegroundNotification(payload));
-    await syncNotificationState();
-    if(navigator.serviceWorker){
-      navigator.serviceWorker.addEventListener("message",async e=>{
-        const d=e.data||{};
-        if(d.type==="SHAAN_NOTIFICATION_CLICK"){
-          if(d.chatUserId)await openNotificationChat(d.chatUserId);
-          if(d.callId)await openNotificationCall(d.callId);
-        }
-      });
-    }
-  }catch(e){console.warn("FCM unavailable",e)}
+  try{messaging=getMessaging(firebaseApp);onMessage(messaging,p=>toastMsg(p.notification?.title||"New message"))}catch(e){console.warn("FCM unavailable",e)}
 }
-
-async function enableNotifications(){
-  if(!currentUser)return;
-  if(!messaging||!VAPID_KEY)return toastMsg("Firebase Web Push VAPID key is missing.");
-  try{
-    const permission=await Notification.requestPermission();
-    if(permission!=="granted")return toastMsg(permission==="denied"?"Notifications are blocked in browser settings.":"Notification permission not granted.");
-    const reg=await navigator.serviceWorker.ready;
-    notificationToken=await getToken(messaging,{vapidKey:VAPID_KEY,serviceWorkerRegistration:reg});
-    if(!notificationToken)throw new Error("FCM token was not returned.");
-    await updateDoc(doc(db,"users",currentUser.uid),{fcmTokens:arrayUnion(notificationToken),notificationsEnabled:true,notificationUpdatedAt:serverTimestamp()});
-    await syncNotificationState();
-    toastMsg("🔔 Browser notifications enabled");
-  }catch(e){console.error("Notifications setup:",e);toastMsg("Notifications setup failed: "+(e?.message||e))}
-}
-
-async function disableNotifications(){
-  if(!currentUser||!messaging)return;
-  try{
-    if(notificationToken){
-      await updateDoc(doc(db,"users",currentUser.uid),{fcmTokens:arrayRemove(notificationToken),notificationsEnabled:false,notificationUpdatedAt:serverTimestamp()});
-      try{await deleteToken(messaging)}catch(_){}
-    }else{
-      await updateDoc(doc(db,"users",currentUser.uid),{notificationsEnabled:false,notificationUpdatedAt:serverTimestamp()});
-    }
-    notificationToken=null;
-    toastMsg("🔕 Notifications disabled on this device");
-    await syncNotificationState();
-  }catch(e){console.error("Disable notifications:",e);toastMsg("Could not disable notifications: "+(e?.message||e))}
-}
-
-async function openNotificationChat(uid){
-  if(!uid||!currentUser)return;
-  try{
-    const snap=await getDoc(doc(db,"users",uid));
-    if(!snap.exists())return toastMsg("Chat user not found.");
-    const u={id:uid,...snap.data()};
-    if((await getDoc(doc(db,"users",currentUser.uid))).data()?.blockedUsers?.includes(uid))return;
-    const el=document.createElement("div");el.className="user";
-    await openChat(u,el);
-  }catch(e){console.warn("Notification chat route:",e);toastMsg("Could not open chat.")}
-}
-
-async function openNotificationCall(callId){
-  if(!callId||!currentUser)return;
-  try{
-    const snap=await getDoc(doc(db,"calls",callId));
-    if(!snap.exists())return;
-    const d={id:snap.id,...snap.data()};
-    if(d.calleeId!==currentUser.uid||d.status!=="ringing")return;
-    incomingCallData=d;
-    incomingCallName.textContent=d.callerName||"User";
-    incomingCallType.textContent=d.type==="video"?"📹 Incoming video call":"📞 Incoming voice call";
-    incomingCallRinging.textContent="🔔 Ringing…";
-    renderAvatar(incomingCallAvatar,d.callerPhotoURL,d.callerName||"User");
-    incomingCallModal.classList.remove("hidden");
-    startRingtone();
-  }catch(e){console.warn("Notification call route:",e)}
-}
-
 $("notifyBtn").onclick=async()=>{
-  if(Notification.permission==="granted" && notificationToken){
-    if(confirm("Disable notifications on this device?"))await disableNotifications();
-    return;
-  }
-  await enableNotifications();
+  if(!messaging||!VAPID_KEY)return toastMsg("Add your Firebase Web Push VAPID key in the code first.");
+  try{
+    const permission=await Notification.requestPermission();if(permission!=="granted")return toastMsg("Notification permission denied.");
+   const reg = await navigator.serviceWorker.ready;notificationToken = await getToken(messaging, {vapidKey: VAPID_KEY,serviceWorkerRegistration: reg});
+    notificationToken=await getToken(messaging,{vapidKey:VAPID_KEY,serviceWorkerRegistration:reg});
+    await updateDoc(doc(db,"users",currentUser.uid),{fcmTokens:arrayUnion(notificationToken)});
+    toastMsg("Browser notifications enabled");
+  }catch(e){console.error(e);toastMsg("Notifications setup failed: "+e.message)}
 };
-
 
 function scrollMessages(){messages.scrollTop=messages.scrollHeight}
 function formatTime(date){return date.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}
