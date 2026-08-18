@@ -239,7 +239,25 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
 .private-note{padding:9px 10px;margin-top:10px;border-radius:10px;background:rgba(0,234,255,.06);color:#9fb2c8;font-size:10px;line-height:1.5}
 .theme-light .private-status,.theme-light .private-option{background:#fff;color:#142033}.theme-light .private-select{background:#fff;color:#142033}
 
+
+/* ===== QR CENTER / PROFILE QR ===== */
+.qr-center-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.qr-card{border:1px solid var(--line);border-radius:15px;background:#101827;padding:16px;text-align:center}
+.qr-card h3{font-size:14px;margin-bottom:5px}.qr-card p{font-size:10px;color:#8490a5;line-height:1.45;margin-bottom:12px}
+.qr-box{width:190px;height:190px;margin:10px auto;padding:10px;border-radius:14px;background:#fff;display:flex;align-items:center;justify-content:center}
+.qr-box img,.qr-box canvas{max-width:170px!important;max-height:170px!important}
+.qr-label{font-size:12px;font-weight:800;color:#dce7f5;margin-top:8px;word-break:break-word}
+.qr-url{font-size:9px;color:#8490a5;word-break:break-all;margin-top:5px;max-height:34px;overflow:hidden}
+.qr-actions{display:flex;justify-content:center;gap:7px;flex-wrap:wrap;margin-top:10px}
+.qr-action{border:1px solid var(--line);border-radius:9px;background:#111927;color:#dce7f5;padding:8px 10px;font-size:11px;font-weight:800;cursor:pointer}
+.qr-action.primary{background:linear-gradient(135deg,#00a9bd,#7137c9);border:0;color:#fff}
+.qr-scan-area{min-height:260px;border:1px dashed rgba(0,234,255,.35);border-radius:13px;overflow:hidden;background:#070b14;margin-top:12px}
+#qrReader{width:100%}.qr-scan-note{font-size:10px;color:#8490a5;text-align:center;margin-top:9px;line-height:1.45}
+.theme-light .qr-card{background:#fff}.theme-light .qr-action{background:#fff;color:#142033}
+@media(max-width:650px){.qr-center-grid{grid-template-columns:1fr}.qr-box{width:180px;height:180px}}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 </head>
 <body>
 
@@ -254,6 +272,7 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
     <input class="input" id="email" type="email" placeholder="Email address">
     <input class="input" id="password" type="password" placeholder="Password">
     <button class="btn auth-main-btn" id="authBtn">Login</button>
+    <button class="small-btn" id="authQrBtn" style="width:100%;margin-top:10px;padding:12px">▣ ShaanChat Install QR</button>
     <div class="switch"><span id="switchText">Create a new account</span></div>
     <p class="error" id="authError"></p>
   </div>
@@ -311,6 +330,7 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
     <div class="modal-title">Profile</div>
     <div class="profile-photo-preview profile-avatar-click" id="profilePhotoPreview">U</div>
     <div class="profile-photo-hint">Tap your photo to view it</div>
+    <div class="qr-actions"><button class="qr-action primary" id="profileQrBtn">▣ My Profile QR</button><button class="qr-action" id="scanQrBtn">📷 Scan QR</button></div>
     <input class="input" id="profileName" placeholder="Name">
     <input class="input" id="profileUsername" placeholder="Username (e.g. shaan123)" maxlength="20">
     <input type="file" class="input" id="profilePhoto" accept="image/*">
@@ -399,6 +419,12 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
       <button class="settings-item" id="profileBtn">
         <span class="settings-icon">👤</span>
         <span class="settings-item-text"><strong>Profile</strong><small>Edit name, username & profile photo</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
+
+      <button class="settings-item" id="qrCenterBtn">
+        <span class="settings-icon">▣</span>
+        <span class="settings-item-text"><strong>QR Center</strong><small>Share your profile QR or let friends install ShaanChat</small></span>
         <span class="settings-arrow">›</span>
       </button>
 
@@ -585,6 +611,42 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
   </div>
 </div>
 
+<!-- ===== QR CENTER ===== -->
+<div class="modal hidden" id="qrCenterModal">
+  <div class="modal-card" style="max-width:760px">
+    <div class="settings-head">
+      <div><div class="modal-title" style="margin-bottom:4px">▣ ShaanChat QR Center</div><div class="settings-subtitle">Add friends instantly or share ShaanChat with another phone</div></div>
+      <button class="settings-close" id="closeQrCenter">✕</button>
+    </div>
+    <div class="qr-center-grid">
+      <div class="qr-card">
+        <h3>👤 My Profile QR</h3><p>Scan this QR on another phone to open your profile and send you a friend request.</p>
+        <div class="qr-box" id="profileQrBox"></div>
+        <div class="qr-label" id="profileQrLabel">@username</div><div class="qr-url" id="profileQrUrl"></div>
+        <div class="qr-actions"><button class="qr-action primary" id="downloadProfileQr">⬇️ Save QR</button><button class="qr-action" id="shareProfileQr">↗️ Share</button></div>
+      </div>
+      <div class="qr-card">
+        <h3>📱 Install ShaanChat</h3><p>Scan this QR with a phone camera to open the ShaanChat web app. From there it can be installed as a PWA when supported.</p>
+        <div class="qr-box" id="appQrBox"></div>
+        <div class="qr-label">ShaanChat App</div><div class="qr-url" id="appQrUrl"></div>
+        <div class="qr-actions"><button class="qr-action primary" id="downloadAppQr">⬇️ Save QR</button><button class="qr-action" id="installAppBtn">📲 Install App</button></div>
+      </div>
+    </div>
+    <div class="qr-actions" style="margin-top:14px"><button class="qr-action" id="openScannerFromCenter">📷 Scan Friend QR</button><button class="qr-action" id="copyProfileQrLink">🔗 Copy Profile Link</button></div>
+    <div class="modal-actions"><button class="small-btn" id="doneQrCenter">Done</button></div>
+  </div>
+</div>
+
+<!-- ===== QR SCANNER ===== -->
+<div class="modal hidden" id="qrScannerModal">
+  <div class="modal-card" style="max-width:520px">
+    <div class="settings-head"><div><div class="modal-title" style="margin-bottom:4px">📷 Scan ShaanChat QR</div><div class="settings-subtitle">Point your camera at a profile or app QR</div></div><button class="settings-close" id="closeQrScanner">✕</button></div>
+    <div class="qr-scan-area"><div id="qrReader"></div></div>
+    <div class="qr-scan-note">Camera scanning requires HTTPS (or localhost) and browser permission. A profile QR opens the profile and sends a friend request after confirmation.</div>
+    <div class="modal-actions"><button class="small-btn" id="stopQrScanner">Stop camera</button><button class="small-btn" id="qrManualLinkBtn">Paste QR link</button></div>
+  </div>
+</div>
+
 <div class="toast hidden" id="toast"></div>
 
 <script type="module">
@@ -719,6 +781,7 @@ const chatStatus=$("chatStatus"),chatUsername=$("chatUsername"),logoutBtn=$("log
 const typingIndicator=$("typingIndicator"),replyBar=$("replyBar"),replyText=$("replyText"),cancelReply=$("cancelReply");
 const fileInput=$("fileInput"),attachBtn=$("attachBtn"),recordBtn=$("recordBtn"),toast=$("toast");
 const profileModal=$("profileModal"),groupModal=$("groupModal"),searchModal=$("searchModal");
+const qrCenterModal=$("qrCenterModal"),qrScannerModal=$("qrScannerModal"),profileQrBox=$("profileQrBox"),appQrBox=$("appQrBox");
 const privacyModal=$("privacyModal"),lastSeenPrivacy=$("lastSeenPrivacy"),onlinePrivacy=$("onlinePrivacy");
 const profilePhotoPreview=$("profilePhotoPreview"),profileImageModal=$("profileImageModal"),
       profileImageLarge=$("profileImageLarge"),profileImageName=$("profileImageName"),
@@ -751,6 +814,7 @@ let unsubscribeIncomingCalls=null,unsubscribeCallDoc=null,unsubscribeCallerCandi
 let incomingCallData=null;
 let callStartedAt=0,callTimer=null,callTimeoutTimer=null;
 let cameraFacingMode="user";
+let qrScanner=null,qrScannerRunning=false,deferredInstallPrompt=null;
 
 // ===== CALL RINGTONE =====
 let ringtoneCtx=null,ringtoneTimer=null,ringtoneGain=null;
@@ -892,7 +956,7 @@ async function handleGroupInvite(){
 onAuthStateChanged(auth,async user=>{
   if(user){
     currentUser=user;authScreen.style.display="none";app.classList.add("show");
-    await ensureUserProfile();await setPresence(true);await loadMyProfile();listenUsers();listenFriendRequests();await loadGroupIndex();await handleGroupInvite();initNotifications();initIncomingCalls();appLockChecked=false;await showAppLockIfEnabled();
+    await ensureUserProfile();await setPresence(true);await loadMyProfile();listenUsers();listenFriendRequests();await loadGroupIndex();await handleGroupInvite();await handleProfileQrLink();initNotifications();initIncomingCalls();appLockChecked=false;await showAppLockIfEnabled();
   }else{
     currentUser=null;app.classList.remove("show");authScreen.style.display="flex";
   }
@@ -2091,6 +2155,125 @@ $("settingsLogoutBtn").onclick=async()=>{
   await setPresence(false);
   await signOut(auth);
 };
+
+
+/* ===== SHAANCHAT QR SYSTEM ===== */
+function getAppUrl(){
+  return `${location.origin}${location.pathname}`;
+}
+function getProfileQrUrl(user=myProfileData){
+  const username=normalizeUsername(user?.username||"");
+  if(!username)return `${getAppUrl()}?profile=login-required`;
+  return `${getAppUrl()}?add=${encodeURIComponent(username)}`;
+}
+function makeQr(target, text, size=170){
+  if(!target)return;
+  target.innerHTML="";
+  if(typeof QRCode==="undefined"){
+    target.textContent="QR library unavailable. Reload the app.";return;
+  }
+  new QRCode(target,{text,width:size,height:size,colorDark:"#07111f",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.M});
+}
+function downloadQr(target,filename){
+  const canvas=target?.querySelector("canvas"),img=target?.querySelector("img");
+  let src=canvas?.toDataURL("image/png")||img?.src;
+  if(!src)return toastMsg("QR is not ready yet.");
+  const a=document.createElement("a");a.href=src;a.download=filename;a.click();
+}
+async function shareText(title,text,url){
+  try{
+    if(navigator.share){await navigator.share({title,text,url});}
+    else{await navigator.clipboard.writeText(url);toastMsg("Link copied");}
+  }catch(e){if(e?.name!=="AbortError")toastMsg("Share cancelled");}
+}
+function renderQrCenter(){
+  const profileUrl=getProfileQrUrl();
+  const appUrl=getAppUrl();
+  makeQr(profileQrBox,profileUrl,170); makeQr(appQrBox,appUrl,170);
+  $("profileQrLabel").textContent=currentUser ? (myProfileData.username?`@${myProfileData.username}`:(myProfileData.name||"My Profile")) : "Login to create your profile QR";
+  $("profileQrUrl").textContent=profileUrl; $("appQrUrl").textContent=appUrl;
+}
+function openQrCenter(){renderQrCenter();qrCenterModal.classList.remove("hidden");}
+async function stopQrScanner(){
+  if(qrScanner&&qrScannerRunning){try{await qrScanner.stop();}catch(e){console.warn("QR stop",e)} }
+  qrScannerRunning=false;
+  try{qrScanner?.clear();}catch(_){ }
+}
+async function handleQrResult(decodedText){
+  await stopQrScanner();qrScannerModal.classList.add("hidden");
+  let u;
+  try{u=new URL(decodedText,location.href)}catch(_){return toastMsg("Invalid QR code.");}
+  if(u.origin!==location.origin || u.pathname!==location.pathname)return toastMsg("This QR is not a ShaanChat link.");
+  const add=u.searchParams.get("add");
+  if(add){
+    qrCenterModal.classList.add("hidden");
+    await processFriendQr(add);
+    return;
+  }
+  toastMsg("ShaanChat QR scanned successfully. Open the link to continue.");
+}
+async function startQrScanner(){
+  qrScannerModal.classList.remove("hidden");
+  if(typeof Html5Qrcode==="undefined")return toastMsg("QR scanner library unavailable. Reload the app.");
+  await stopQrScanner();
+  qrScanner=new Html5Qrcode("qrReader");
+  try{
+    await qrScanner.start({facingMode:"environment"},{fps:10,qrbox:{width:240,height:240}},handleQrResult,()=>{});
+    qrScannerRunning=true;
+  }catch(e){console.error("QR camera:",e);toastMsg("Camera could not start. Check HTTPS and camera permission.");}
+}
+async function processFriendQr(identifier){
+  if(!currentUser)return toastMsg("Please login first, then scan the profile QR.");
+  const value=String(identifier||"").trim();if(!value)return;
+  try{
+    let snap;
+    if(value.includes("@")){
+      const username=value.replace(/^@/,'').toLowerCase();
+      snap=await getDocs(query(collection(db,"users"),where("usernameLower","==",username)));
+    }else if(value.includes("@")===false && value.length>15){
+      const direct=await getDoc(doc(db,"users",value));
+      snap={empty:!direct.exists(),docs:direct.exists()?[direct]:[]};
+    }else{
+      snap=await getDocs(query(collection(db,"users"),where("usernameLower","==",value.toLowerCase())));
+    }
+    if(snap.empty)return toastMsg("ShaanChat profile not found.");
+    const u={id:snap.docs[0].id,...snap.docs[0].data()};
+    if(u.id===currentUser.uid)return toastMsg("That is your own profile QR.");
+    const ok=confirm(`Add ${u.name||"this person"}${u.username?` (@${u.username})`:""} as a friend?`);
+    if(!ok)return;
+    await sendFriendRequest(u); await openChat(u);
+    history.replaceState({},document.title,location.pathname);
+  }catch(e){console.error("Profile QR:",e);toastMsg("Could not process profile QR: "+(e?.message||"Unknown error"));}
+}
+async function handleProfileQrLink(){
+  const params=new URLSearchParams(location.search);const add=params.get("add");
+  if(add&&currentUser){
+    try{const snap=await getDoc(doc(db,"users",currentUser.uid));if(snap.exists())myProfileData=snap.data()||{};}catch(_){}
+    await processFriendQr(add);
+  }
+}
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredInstallPrompt=e;});
+async function installShaanChat(){
+  if(deferredInstallPrompt){deferredInstallPrompt.prompt();try{await deferredInstallPrompt.userChoice;}catch(_){}deferredInstallPrompt=null;return;}
+  if(/iphone|ipad|ipod/i.test(navigator.userAgent))return toastMsg("On iPhone: Share → Add to Home Screen.");
+  toastMsg("Open this link in your browser and use Install app / Add to Home Screen.");
+}
+
+$("qrCenterBtn").onclick=()=>{settingsModal.classList.add("hidden");openQrCenter();};
+$("profileQrBtn").onclick=()=>{profileModal.classList.add("hidden");openQrCenter();};
+$("scanQrBtn").onclick=startQrScanner;
+$("authQrBtn").onclick=()=>{qrCenterModal.classList.remove("hidden");renderQrCenter();};
+$("closeQrCenter").onclick=()=>qrCenterModal.classList.add("hidden");
+$("doneQrCenter").onclick=()=>qrCenterModal.classList.add("hidden");
+$("openScannerFromCenter").onclick=startQrScanner;
+$("closeQrScanner").onclick=async()=>{await stopQrScanner();qrScannerModal.classList.add("hidden")};
+$("stopQrScanner").onclick=stopQrScanner;
+$("downloadProfileQr").onclick=()=>downloadQr(profileQrBox,"shaanchat-profile-qr.png");
+$("downloadAppQr").onclick=()=>downloadQr(appQrBox,"shaanchat-install-qr.png");
+$("shareProfileQr").onclick=()=>shareText("ShaanChat Profile",`Add ${myProfileData.name||"me"} on ShaanChat`,getProfileQrUrl());
+$("copyProfileQrLink").onclick=async()=>{try{await navigator.clipboard.writeText(getProfileQrUrl());toastMsg("Profile link copied")}catch(_){toastMsg(getProfileQrUrl())}};
+$("installAppBtn").onclick=installShaanChat;
+$("qrManualLinkBtn").onclick=async()=>{const link=prompt("Paste a ShaanChat profile QR link:","");if(link)await handleQrResult(link)};
 
 $("profileBtn").onclick=async()=>{
   settingsModal.classList.add("hidden");
