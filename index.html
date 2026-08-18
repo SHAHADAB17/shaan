@@ -562,46 +562,85 @@ const firebaseConfig = {
 const APP_CHECK_SITE_KEY="";
 
 /* ===== CLOUDINARY MEDIA STORAGE =====
-   Create an UNSIGNED upload preset in Cloudinary and paste these two public values.
-   Never put your Cloudinary API secret in this HTML file. */
+   Browser uploads use an UNSIGNED Cloudinary upload preset.
+   Never put the Cloudinary API secret in this file. */
 const CLOUDINARY_CLOUD_NAME="xafyypjl";
 const CLOUDINARY_UPLOAD_PRESET="shaanchat_upload";
-
-/* Optional client-side limits. Cloudinary account/plan limits still apply. */
 const CLOUDINARY_MAX_FILE_SIZE=20*1024*1024;
 
 function cloudinaryConfigured(){
-  return CLOUDINARY_CLOUD_NAME &&
-         CLOUDINARY_UPLOAD_PRESET &&
-         !CLOUDINARY_CLOUD_NAME.startsWith("YOUR_") &&
-         !CLOUDINARY_UPLOAD_PRESET.startsWith("YOUR_");
+  return typeof CLOUDINARY_CLOUD_NAME==="string" &&
+         typeof CLOUDINARY_UPLOAD_PRESET==="string" &&
+         CLOUDINARY_CLOUD_NAME.trim()!=="" &&
+         CLOUDINARY_UPLOAD_PRESET.trim()!=="" &&
+         !/^YOUR_/i.test(CLOUDINARY_CLOUD_NAME) &&
+         !/^YOUR_/i.test(CLOUDINARY_UPLOAD_PRESET);
 }
 
-async function uploadToCloudinary(file,{folder="shaanchat",resourceType="auto"}={}){
-  if(!file)throw new Error("No file selected.");
-  if(file.size>CLOUDINARY_MAX_FILE_SIZE)throw new Error("File must be 20 MB or smaller.");
-  if(!cloudinaryConfigured())throw new Error("Cloudinary configuration is missing. Check CLOUDINARY_CLOUD_NAME and CLOUDINARY_UPLOAD_PRESET.");
+function cloudinaryResourceType(file){
+  const type=(file?.type||"").toLowerCase();
+  if(type.startsWith("image/")) return "image";
+  if(type.startsWith("video/") || type.startsWith("audio/")) return "video";
+  return "raw";
+}
 
-  const endpoint=`https://api.cloudinary.com/v1_1/${encodeURIComponent(CLOUDINARY_CLOUD_NAME)}/${resourceType}/upload`;
+function cloudinaryEndpoint(resourceType){
+  return `https://api.cloudinary.com/v1_1/${encodeURIComponent(CLOUDINARY_CLOUD_NAME)}/${resourceType}/upload`;
+}
+
+async function uploadToCloudinary(file,{folder="shaanchat"}={}){
+  if(!file) throw new Error("No file selected.");
+  if(!cloudinaryConfigured()) throw new Error("Cloudinary is not configured.");
+  if(file.size<=0) throw new Error("The selected file is empty.");
+  if(file.size>CLOUDINARY_MAX_FILE_SIZE) throw new Error("File must be 20 MB or smaller.");
+
+  const resourceType=cloudinaryResourceType(file);
   const form=new FormData();
-  form.append("file",file);
+  form.append("file",file,file.name||"upload");
   form.append("upload_preset",CLOUDINARY_UPLOAD_PRESET);
-  form.append("folder",folder);
 
-  const response=await fetch(endpoint,{method:"POST",body:form});
-  let data=null;
-  try{data=await response.json();}catch(e){}
-  if(!response.ok){
-    throw new Error(data?.error?.message||`Cloudinary upload failed (${response.status}).`);
+  // Dynamic Folders are enabled in this Cloudinary environment.
+  // `asset_folder` is supported for unsigned uploads in Dynamic Folder mode.
+  if(folder) form.append("asset_folder",folder);
+
+  let response;
+  try{
+    response=await fetch(cloudinaryEndpoint(resourceType),{
+      method:"POST",
+      body:form,
+      credentials:"omit",
+      cache:"no-store"
+    });
+  }catch(err){
+    console.error("Cloudinary fetch error:",err);
+    throw new Error("Cloudinary network/CORS error. Check the internet connection and Cloudinary upload preset.");
   }
-  if(!data?.secure_url)throw new Error("Cloudinary did not return a media URL.");
-  return data.secure_url;
+
+  const raw=await response.text();
+  let data=null;
+  try{data=raw?JSON.parse(raw):null}catch(_){data=null;}
+
+  if(!response.ok){
+    const message=data?.error?.message || raw || `Cloudinary upload failed (HTTP ${response.status})`;
+    const requestId=response.headers.get("x-cld-request-id")||response.headers.get("x-request-id");
+    throw new Error(`${message}${requestId?` [Request ${requestId}]`:""}`);
+  }
+
+  const url=data?.secure_url||data?.url;
+  if(!url) throw new Error("Cloudinary returned no media URL.");
+  return {
+    url,
+    secure_url:data?.secure_url||url,
+    public_id:data?.public_id||null,
+    resource_type:data?.resource_type||resourceType,
+    format:data?.format||null,
+    bytes:data?.bytes||file.size,
+    original_filename:data?.original_filename||file.name||""
+  };
 }
 
 async function uploadMedia(file,folder="shaanchat/media"){
-  const type=(file?.type||"").toLowerCase();
-  const resourceType=type.startsWith("image/")?"image":(type.startsWith("video/")||type.startsWith("audio/"))?"video":"raw";
-  return uploadToCloudinary(file,{folder,resourceType});
+  return uploadToCloudinary(file,{folder});
 }
 
 /* OPTIONAL: paste your Firebase Cloud Messaging Web Push VAPID public key here. */
@@ -1664,7 +1703,8 @@ async function uploadAttachment(file){
   try{
     toastMsg("Uploading "+file.name+"…");
     const folder=`shaanchat/chat/${selectedChat.id}/${currentUser.uid}`;
-    const url=await uploadMedia(file,folder);
+    const uploaded=await uploadMedia(file,folder);
+    const url=uploaded.secure_url;
     const type=file.type.startsWith("image/")?"image":file.type.startsWith("video/")?"video":file.type.startsWith("audio/")?"audio":"file";
     await addDoc(collection(db,"chats",selectedChat.id,"messages"),{
       type,url,fileName:file.name,mimeType:file.type,size:file.size,senderId:currentUser.uid,
@@ -1689,7 +1729,8 @@ recordBtn.onclick=async()=>{
 async function uploadVoice(blob){
   try{
     const file=new File([blob],`voice-message-${Date.now()}.webm`,{type:blob.type||"audio/webm"});
-    const url=await uploadMedia(file,`shaanchat/voice/${selectedChat.id}/${currentUser.uid}`);
+    const uploaded=await uploadMedia(file,`shaanchat/voice/${selectedChat.id}/${currentUser.uid}`);
+    const url=uploaded.secure_url;
     await addDoc(collection(db,"chats",selectedChat.id,"messages"),{type:"audio",url,fileName:"voice-message.webm",senderId:currentUser.uid,receiverId:selectedUser.isGroup?null:selectedUser.id,delivered:false,seen:false,createdAt:serverTimestamp(),storageProvider:"cloudinary"});
     toastMsg("Voice sent");
   }catch(e){console.error("Cloudinary voice upload:",e);toastMsg("Voice upload failed: "+(e?.message||"Cloudinary error"));}
@@ -1719,7 +1760,7 @@ $("profilePhoto").onchange=async()=>{
     profilePhotoPreview.onclick=(ev)=>{
       ev.preventDefault();
       ev.stopPropagation();
-      openProfileImage(previewURL,$("profileName").value||"User");
+      toastMsg("Preview shown. Tap Save to upload this photo.");
     };
   }catch(e){
     toastMsg(e.message||"Image preview failed.");
@@ -1790,7 +1831,7 @@ async function imageToCloudinary(file,folder){
   if(!file)return null;
   if(!file.type.startsWith("image/"))throw new Error("Please select an image.");
   if(file.size>10*1024*1024)throw new Error("Image must be 10 MB or smaller.");
-  return uploadToCloudinary(file,{folder,resourceType:"image"});
+  return (await uploadToCloudinary(file,{folder})).secure_url;
 }
 
 $("saveProfile").onclick=async()=>{
@@ -1821,7 +1862,7 @@ $("saveProfile").onclick=async()=>{
     toastMsg(photoURL?"Profile photo updated":"Profile updated");
   }catch(e){
     console.error("Profile save:",e);
-    toastMsg("Profile update failed: "+(e?.message||"Unknown error"));
+    toastMsg("Profile upload failed: "+(e?.message||"Unknown error"));
   }
 };
 
@@ -2521,7 +2562,7 @@ function toastMsg(text){toast.textContent=text;toast.classList.remove("hidden");
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("./service-worker.js")
+      .register("./service-worker.js?v=20260818-cloudinary-v3")
       .then(registration => {
         console.log("ShaanChat Service Worker registered:", registration.scope);
       })
@@ -3424,7 +3465,7 @@ body.sc-reduced-motion *,body.sc-reduced-motion *::before,body.sc-reduced-motion
 
   /* expose small helpers for future upgrades */
   window.ShaanChatUX={
-    version:"2026.08 Pro UX",
+    version:"2026.08 Pro UX • Cloudinary v2",
     state,
     saveState,
     toast,
