@@ -155,7 +155,7 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
   cursor:pointer;font-size:11px;font-weight:800;
 }
 .media-download-btn:hover,.media-open-btn:hover{background:#1b2638;border-color:rgba(0,234,255,.35);color:#fff}
-.media-viewer{position:fixed;inset:0;background:rgba(0,0,0,.92);backdrop-filter:blur(14px);display:flex;align-items:center;justify-content:center;z-index:800;padding:18px}
+.media-viewer{position:fixed;inset:0;background:rgba(0,0,0,.94);backdrop-filter:blur(14px);display:none;align-items:center;justify-content:center;z-index:99999;padding:18px}.media-viewer:not(.hidden){display:flex!important}
 .media-viewer-card{position:relative;width:min(96vw,1100px);height:min(92vh,900px);display:flex;flex-direction:column;align-items:center;justify-content:center}
 .media-viewer-content{max-width:100%;max-height:78vh;width:auto;height:auto;object-fit:contain;border-radius:14px;background:#05080e;box-shadow:0 25px 100px rgba(0,0,0,.65)}
 .media-viewer-video{width:min(96vw,1000px);max-height:78vh}
@@ -504,7 +504,7 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
     <div class="call-avatar" id="incomingCallAvatar">U</div>
     <div class="call-title" id="incomingCallName">Incoming call</div>
     <div class="call-subtitle" id="incomingCallType">Voice call</div>
-    <div class="call-ringing-text" id="incomingCallRinging">🔔 Ringing…</div>
+    <div class="call-ringing-text" id="incomingCallRinging">🔔 Ringing…</div><div style="color:#8490a5;font-size:10px;margin-top:6px">If you hear no sound, tap Accept once to enable call audio.</div>
     <div class="call-buttons">
       <button class="call-btn reject" id="rejectIncomingBtn" title="Reject">✕</button>
       <button class="call-btn accept" id="acceptIncomingBtn" title="Accept">✓</button>
@@ -528,7 +528,7 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
     <div class="call-control-bar">
       <button class="call-control" id="muteCallBtn" title="Mute">🎤</button>
       <button class="call-control" id="cameraCallBtn" title="Camera" >📹</button>
-      <button class="call-control" id="speakerCallBtn" title="Speaker">🔊</button>
+      <button class="call-control" id="speakerCallBtn" title="Speaker">🔊</button><button class="call-control" id="enableCallSoundBtn" title="Enable sound">🔈</button>
       <button class="call-control hidden" id="flipCameraBtn" title="Switch camera">🔄</button>
       <button class="call-control end" id="endCallBtn" title="End call">📞</button>
     </div>
@@ -774,7 +774,7 @@ async function startRingtone(){
     if(ringtoneCtx.state==="suspended")await ringtoneCtx.resume();
 
     ringtoneGain=ringtoneCtx.createGain();
-    ringtoneGain.gain.value=0.7;
+    ringtoneGain.gain.value=1.0;
     ringtoneGain.connect(ringtoneCtx.destination);
 
     const beep=()=>{
@@ -1604,134 +1604,127 @@ function mediaFileName(d, fallback="download"){
   return String(d?.fileName || fallback).replace(/[\\/:*?"<>|]+/g,"_").trim() || fallback;
 }
 
+function cloudinaryDownloadUrl(url,filename){
+  if(!url)return url;
+  try{
+    const u=new URL(url);
+    const marker="/upload/";
+    const i=u.pathname.indexOf(marker);
+    if(i<0)return url;
+    const safe=String(filename||"download").replace(/[\\/:*?"<>|]+/g,"_").trim()||"download";
+    const before=u.pathname.slice(0,i+marker.length);
+    const after=u.pathname.slice(i+marker.length);
+    // Cloudinary's fl_attachment forces a download without relying on
+    // cross-origin fetch/blob permissions.
+    u.pathname=before+"fl_attachment:"+encodeURIComponent(safe)+"/"+after;
+    return u.toString();
+  }catch(_){return url;}
+}
+
 async function downloadMedia(url, filename="download"){
   if(!url){toastMsg("Media URL not available.");return;}
+  const safeName=mediaFileName({fileName:filename},"download");
+  const direct=cloudinaryDownloadUrl(url,safeName);
   try{
-    toastMsg("Preparing download…");
-    const response=await fetch(url,{mode:"cors",credentials:"omit",cache:"no-store"});
-    if(!response.ok)throw new Error(`HTTP ${response.status}`);
-    const blob=await response.blob();
-    const objectUrl=URL.createObjectURL(blob);
     const a=document.createElement("a");
-    a.href=objectUrl;
-    a.download=filename;
-    a.rel="noopener";
+    a.href=direct;
+    a.download=safeName;
+    a.target="_blank";
+    a.rel="noopener noreferrer";
     document.body.appendChild(a);
     a.click();
     a.remove();
-    setTimeout(()=>URL.revokeObjectURL(objectUrl),1500);
     toastMsg("Download started");
   }catch(e){
-    console.warn("Direct download failed:",e);
-    // Cross-origin fallback: opening the original secure URL still lets the
-    // browser save the file manually when a forced download is blocked.
-    const a=document.createElement("a");
-    a.href=url;
-    a.target="_blank";
-    a.rel="noopener";
-    a.download=filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    toastMsg("Opened media. Use Save/Download if the browser blocks automatic download.");
+    console.warn("Cloudinary download link failed:",e);
+    try{window.open(direct,"_blank","noopener,noreferrer");toastMsg("Download opened");}
+    catch(_){toastMsg("Unable to open download");}
   }
 }
 
 function addMediaActions(parent,d,{open=false}={}){
   const row=document.createElement("div");
   row.className="media-download-row";
-
   if(open){
     const openBtn=document.createElement("button");
-    openBtn.type="button";
-    openBtn.className="media-open-btn";
+    openBtn.type="button";openBtn.className="media-open-btn";
     openBtn.textContent="🔍 View full";
-    openBtn.onclick=()=>openMediaViewer(d);
+    openBtn.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();openMediaViewer(d);});
     row.appendChild(openBtn);
   }
-
   const dl=document.createElement("button");
-  dl.type="button";
-  dl.className="media-download-btn";
-  dl.textContent="⬇️ Download";
-  dl.onclick=()=>downloadMedia(d.url,mediaFileName(d,"media"));
+  dl.type="button";dl.className="media-download-btn";dl.textContent="⬇️ Download";
+  dl.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();downloadMedia(d.url,mediaFileName(d,"media"));});
   row.appendChild(dl);
-
   parent.appendChild(row);
 }
 
 function openMediaViewer(d){
-  if(!d?.url)return toastMsg("Media URL not available.");
+  if(!d?.url){toastMsg("Media URL not available.");return;}
   const viewer=document.getElementById("mediaViewer");
   const content=document.getElementById("mediaViewerContent");
   const title=document.getElementById("mediaViewerTitle");
   const download=document.getElementById("mediaViewerDownload");
   const open=document.getElementById("mediaViewerOpen");
-  if(!viewer||!content||!title||!download||!open)return;
+  if(!viewer||!content||!title||!download||!open){toastMsg("Media viewer is unavailable. Refresh the page.");return;}
 
-  content.innerHTML="";
+  content.replaceChildren();
   title.textContent=d.fileName||"Media";
-  open.href=d.url;
-  download.onclick=()=>downloadMedia(d.url,mediaFileName(d,"media"));
+  open.href=d.url; open.target="_blank"; open.rel="noopener noreferrer";
+  download.onclick=e=>{e.preventDefault();e.stopPropagation();downloadMedia(d.url,mediaFileName(d,"media"));};
 
-  const type=d.type;
+  const type=d.type||"file";
   if(type==="image"){
     const img=document.createElement("img");
-    img.className="media-viewer-content";
-    img.src=d.url; img.alt=d.fileName||"Image";
-    content.appendChild(img);
+    img.className="media-viewer-content";img.alt=d.fileName||"Image";
+    img.onload=()=>toastMsg("Image opened");
+    img.onerror=()=>{content.innerHTML="<div class='media-fallback'>⚠️ Unable to load this image. <a href='"+escAttr(d.url)+"' target='_blank' rel='noopener'>Open original</a></div>";};
+    img.src=d.url;content.appendChild(img);
   }else if(type==="video"){
     const video=document.createElement("video");
     video.className="media-viewer-content media-viewer-video";
-    video.controls=true; video.autoplay=false; video.playsInline=true;
-    video.preload="metadata";
-    const source=document.createElement("source");
-    source.src=d.url; if(d.mimeType)source.type=d.mimeType;
-    video.appendChild(source);
-    content.appendChild(video);
+    video.controls=true;video.playsInline=true;video.preload="metadata";video.muted=false;
+    const source=document.createElement("source");source.src=d.url;if(d.mimeType)source.type=d.mimeType;
+    video.appendChild(source);content.appendChild(video);
+    video.addEventListener("error",()=>toastMsg("Video could not be loaded"));
   }else if(type==="audio"){
     const audio=document.createElement("audio");
-    audio.className="media-viewer-audio";
-    audio.controls=true; audio.preload="metadata";
-    audio.src=d.playbackUrl||d.url;
+    audio.className="media-viewer-audio";audio.controls=true;audio.preload="metadata";audio.autoplay=false;
+    audio.src=d.url;
     content.appendChild(audio);
+    // Prefer original Cloudinary audio URL first; generated mp3 transforms can
+    // fail when the account does not allow that transformation.
+    audio.addEventListener("error",()=>{
+      if(d.playbackUrl && audio.src!==d.playbackUrl){audio.src=d.playbackUrl;audio.load();}
+      else toastMsg("Audio could not be loaded");
+    });
   }else{
     const isPdf=(d.mimeType||"").toLowerCase()==="application/pdf" || /\.pdf$/i.test(d.fileName||"");
     if(isPdf){
-      const iframe=document.createElement("iframe");
-      iframe.className="media-viewer-pdf";
-      iframe.src=d.url+"#toolbar=1&navpanes=0";
-      iframe.title=d.fileName||"PDF";
-      content.appendChild(iframe);
+      const iframe=document.createElement("iframe");iframe.className="media-viewer-pdf";iframe.src=d.url+"#toolbar=1&navpanes=0";iframe.title=d.fileName||"PDF";content.appendChild(iframe);
     }else{
-      const box=document.createElement("div");
-      box.className="media-fallback";
-      box.innerHTML=`📄 <strong>${esc(d.fileName||"File")}</strong>`;
+      const box=document.createElement("div");box.className="media-fallback";
+      box.innerHTML=`📄 <strong>${esc(d.fileName||"File")}</strong><br><a href="${escAttr(d.url)}" target="_blank" rel="noopener">Open file</a>`;
       content.appendChild(box);
     }
   }
-
   viewer.classList.remove("hidden");
   viewer.setAttribute("aria-hidden","false");
+  viewer.style.display="flex";
+  document.body.style.overflow="hidden";
 }
 
 function closeMediaViewer(){
   const viewer=document.getElementById("mediaViewer");
   const content=document.getElementById("mediaViewerContent");
-  if(content)content.innerHTML="";
-  if(viewer){
-    viewer.classList.add("hidden");
-    viewer.setAttribute("aria-hidden","true");
-  }
+  if(content)content.replaceChildren();
+  if(viewer){viewer.classList.add("hidden");viewer.setAttribute("aria-hidden","true");viewer.style.display="none";}
+  document.body.style.overflow="";
 }
 
-document.getElementById("mediaViewerClose")?.addEventListener("click",closeMediaViewer);
-document.getElementById("mediaViewer")?.addEventListener("click",e=>{
-  if(e.target.id==="mediaViewer")closeMediaViewer();
-});
-document.addEventListener("keydown",e=>{
-  if(e.key==="Escape")closeMediaViewer();
-});
+document.getElementById("mediaViewerClose")?.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();closeMediaViewer();});
+document.getElementById("mediaViewer")?.addEventListener("click",e=>{if(e.target.id==="mediaViewer")closeMediaViewer();});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeMediaViewer();});
 
 function renderMessage(d){
   const sent=d.senderId===currentUser.uid;
@@ -1763,7 +1756,7 @@ function renderMessage(d){
     const img=document.createElement("img");
     img.className="media media-clickable";img.src=d.url;img.alt=d.fileName||"image";img.loading="lazy";
     img.title="Click to view full image";
-    img.onclick=()=>openMediaViewer(d);
+    img.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();openMediaViewer(d);});
     img.onerror=()=>{img.replaceWith(mediaFallback(d.url,d.fileName||"Image"));};
     bubble.appendChild(img);
     addMediaActions(bubble,d,{open:true});
@@ -1794,10 +1787,10 @@ function renderMessage(d){
       fileCard.appendChild(bar);
       const actions=document.createElement("div");actions.className="media-download-row";
       const view=document.createElement("button");view.type="button";view.className="media-open-btn";view.textContent="🔍 View full";
-      view.onclick=()=>openMediaViewer(d);
+      view.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();openMediaViewer(d);});
       const open=document.createElement("a");open.className="media-open-btn";open.textContent="↗️ Open";open.href=d.url;open.target="_blank";open.rel="noopener";
       const dl=document.createElement("button");dl.type="button";dl.className="media-download-btn";dl.textContent="⬇️ Download";
-      dl.onclick=()=>downloadMedia(d.url,mediaFileName(d,"document.pdf"));
+      dl.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();downloadMedia(d.url,mediaFileName(d,"document.pdf"));});
       actions.append(view,open,dl);fileCard.appendChild(actions);
     }else{
       const row=document.createElement("div");row.className="file-card";
@@ -2536,9 +2529,16 @@ function setupPeerConnection(callId,role,type,remoteId){
   peerConnection.ontrack=e=>{
     if(e.streams?.[0]){
       remoteVideo.srcObject=e.streams[0];
+      remoteVideo.autoplay=true;
+      remoteVideo.playsInline=true;
       remoteVideo.muted=false;
-      remoteVideo.play().catch(()=>{});
-      activeCallStatus.textContent="Connected";
+      remoteVideo.volume=1;
+      remoteVideo.play().then(()=>{
+        activeCallStatus.textContent="Connected";
+      }).catch(()=>{
+        activeCallStatus.textContent="Connected • tap 🔈 for sound";
+        speakerCallBtn.classList.add("disabled");
+      });
     }
   };
 
@@ -2645,6 +2645,8 @@ async function acceptIncomingCall(){
     stopRingtone();
     incomingCallAvatar.classList.remove("incoming-call-pulse");
     incomingCallModal.classList.add("hidden");
+    // Accept is a real user gesture: unlock browser audio here.
+    try{if(ringtoneCtx?.state==="suspended")await ringtoneCtx.resume();}catch(_){}
     currentCallId=data.callId;currentCallType=data.type;currentCallRole="callee";
     localStream=await getCallMedia(data.type);
     localVideo.srcObject=localStream;
@@ -2767,14 +2769,28 @@ cameraCallBtn.onclick=()=>{
   cameraCallBtn.classList.toggle("active",!track.enabled);
 };
 
-speakerCallBtn.onclick=()=>{
+async function enableCallSound(){
   try{
-    remoteVideo.muted=!remoteVideo.muted;
-    speakerCallBtn.textContent=remoteVideo.muted?"🔇":"🔊";
-    speakerCallBtn.classList.toggle("active",!remoteVideo.muted);
-    if(!remoteVideo.muted)remoteVideo.play().catch(()=>{});
-  }catch(_){}
-};
+    if(ringtoneCtx?.state==="suspended")await ringtoneCtx.resume();
+    remoteVideo.muted=false;
+    remoteVideo.volume=1;
+    await remoteVideo.play();
+    speakerCallBtn.textContent="🔊";
+    speakerCallBtn.classList.remove("disabled");
+    toastMsg("Call sound enabled");
+  }catch(e){
+    console.warn("Call sound enable:",e);
+    toastMsg("Tap the speaker button to enable sound");
+  }
+}
+
+enableCallSoundBtn.onclick=enableCallSound;
+
+document.addEventListener("visibilitychange",()=>{
+  if(!document.hidden && currentCallId && remoteVideo.srcObject && !remoteVideo.muted){remoteVideo.play().catch(()=>{});}
+});
+
+speakerCallBtn.onclick=()=>{enableCallSound();};
 
 flipCameraBtn.onclick=async()=>{
   if(currentCallType!=="video"||!localStream)return;
