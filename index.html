@@ -40,7 +40,17 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
 .messages{flex:1;padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:10px}.empty{margin:auto;text-align:center;color:#778298}
 .message-wrap{max-width:78%;display:flex;flex-direction:column;position:relative}.message-wrap.sent{align-self:flex-end;align-items:flex-end}.message-wrap.received{align-self:flex-start;align-items:flex-start}
 .message{padding:8px 11px;border-radius:15px;line-height:1.35;word-break:break-word;background:var(--bubble);position:relative;font-size:13px}.sent .message{background:var(--mine);border-bottom-right-radius:4px}.received .message{border-bottom-left-radius:4px}
-.message img.media{max-width:280px;max-height:300px;border-radius:12px;display:block}.file-card{display:flex;align-items:center;gap:9px;min-width:200px}.file-card a{color:#fff;text-decoration:none;font-weight:700}.message-time{display:block;font-size:10px;opacity:.65;margin-top:5px;text-align:right}.ticks{font-size:11px;margin-left:4px}.ticks.seen{color:#69efff}
+.message img.media{max-width:280px;max-height:300px;border-radius:12px;display:block}
+.chat-video{display:block;width:min(360px,70vw);max-height:360px;border-radius:12px;background:#05080e;object-fit:contain}
+.chat-audio{display:block;width:min(360px,70vw);min-width:260px;height:42px}
+.chat-pdf{display:block;width:min(420px,75vw);height:420px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.file-card-pdf{display:block;min-width:min(420px,75vw);max-width:min(420px,75vw);overflow:hidden}
+.file-card-bar{display:flex;align-items:center;gap:8px;padding:9px 4px 2px;font-size:11px;flex-wrap:wrap}
+.file-card-bar strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:230px}
+.file-card-bar a{color:#7fefff!important;text-decoration:none!important}
+.media-fallback{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--line);border-radius:10px;background:#101827}
+.media-fallback a{color:#7fefff;text-decoration:none;font-weight:700}
+.file-card{display:flex;align-items:center;gap:9px;min-width:200px}.file-card a{color:#fff;text-decoration:none;font-weight:700}.message-time{display:block;font-size:10px;opacity:.65;margin-top:5px;text-align:right}.ticks{font-size:11px;margin-left:4px}.ticks.seen{color:#69efff}
 .reply-preview{border-left:3px solid var(--cyan);padding:6px 8px;margin-bottom:7px;background:rgba(0,0,0,.16);border-radius:7px;font-size:11px;opacity:.85}
 .message-actions{display:none;gap:4px;position:absolute;top:-35px;background:#111927;border:1px solid var(--line);padding:4px;border-radius:9px;z-index:3}.message-wrap:hover .message-actions{display:flex}.message-actions button{border:0;background:transparent;color:#cbd4e3;cursor:pointer;padding:5px 7px;border-radius:7px;font-size:12px}.message-actions button:hover{background:#1b2638;color:#fff}
 .typing{height:22px;padding:0 20px;color:#65dff0;font-size:12px;font-style:italic}
@@ -133,6 +143,36 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
 .profile-photo-hint{text-align:center;color:#8490a5;font-size:11px;margin:-3px 0 12px}
 .profile-image-large{cursor:zoom-in}
 .profile-image-large:active{cursor:default}
+
+/* ===== CHAT MEDIA VIEWER + DOWNLOAD ===== */
+.media-clickable{cursor:zoom-in;transition:transform .16s ease,filter .16s ease}
+.media-clickable:hover{filter:brightness(1.06);transform:scale(1.01)}
+.media-download-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:7px}
+.media-download-btn,.media-open-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:5px;
+  padding:7px 10px;border:1px solid var(--line);border-radius:8px;
+  background:#111927;color:#eaf0fb;text-decoration:none!important;
+  cursor:pointer;font-size:11px;font-weight:800;
+}
+.media-download-btn:hover,.media-open-btn:hover{background:#1b2638;border-color:rgba(0,234,255,.35);color:#fff}
+.media-viewer{position:fixed;inset:0;background:rgba(0,0,0,.92);backdrop-filter:blur(14px);display:flex;align-items:center;justify-content:center;z-index:800;padding:18px}
+.media-viewer-card{position:relative;width:min(96vw,1100px);height:min(92vh,900px);display:flex;flex-direction:column;align-items:center;justify-content:center}
+.media-viewer-content{max-width:100%;max-height:78vh;width:auto;height:auto;object-fit:contain;border-radius:14px;background:#05080e;box-shadow:0 25px 100px rgba(0,0,0,.65)}
+.media-viewer-video{width:min(96vw,1000px);max-height:78vh}
+.media-viewer-audio{width:min(700px,92vw);height:52px}
+.media-viewer-title{max-width:90%;margin-top:12px;color:#fff;font-size:13px;font-weight:800;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.media-viewer-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:12px}
+.media-viewer-close{position:absolute;right:0;top:0;width:42px;height:42px;border:1px solid rgba(255,255,255,.18);border-radius:50%;background:#111927;color:#fff;font-size:20px;cursor:pointer;z-index:2}
+.media-viewer-close:hover{background:#1b2638}
+.media-viewer-pdf{width:min(92vw,900px);height:78vh;border:1px solid rgba(255,255,255,.14);border-radius:12px;background:#fff}
+@media(max-width:600px){
+  .media-viewer{padding:10px}
+  .media-viewer-card{width:100%;height:94vh}
+  .media-viewer-content,.media-viewer-video{max-width:98vw;max-height:72vh}
+  .media-viewer-pdf{width:96vw;height:72vh}
+  .media-download-btn,.media-open-btn{padding:8px 10px;font-size:10px}
+}
+
 @media(max-width:600px){
   .profile-image-card{max-width:96vw}
   .profile-image-large{max-width:96vw;max-height:72vh;border-radius:14px}
@@ -495,6 +535,20 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
   </div>
 </div>
 
+
+
+<!-- Chat media viewer -->
+<div class="media-viewer hidden" id="mediaViewer" aria-hidden="true">
+  <div class="media-viewer-card" id="mediaViewerCard">
+    <button class="media-viewer-close" id="mediaViewerClose" aria-label="Close">✕</button>
+    <div id="mediaViewerContent"></div>
+    <div class="media-viewer-title" id="mediaViewerTitle"></div>
+    <div class="media-viewer-actions">
+      <button class="media-download-btn" id="mediaViewerDownload" type="button">⬇️ Download</button>
+      <a class="media-open-btn" id="mediaViewerOpen" href="#" target="_blank" rel="noopener">↗️ Open</a>
+    </div>
+  </div>
+</div>
 
 <div class="profile-image-modal hidden" id="profileImageModal">
   <div class="profile-image-card">
@@ -1540,6 +1594,145 @@ function listenMessages(chatId){
     markMessagesSeen(chatId);
   },e=>{console.error(e);toastMsg("Chat read error: "+e.message)});
 }
+function mediaFallback(url,name){
+  const box=document.createElement("div");box.className="media-fallback";
+  box.innerHTML=`<span>⚠️ ${esc(name||"Media")}</span><a href="${escAttr(url||"#")}" target="_blank" rel="noopener">Open</a>`;
+  return box;
+}
+
+function mediaFileName(d, fallback="download"){
+  return String(d?.fileName || fallback).replace(/[\\/:*?"<>|]+/g,"_").trim() || fallback;
+}
+
+async function downloadMedia(url, filename="download"){
+  if(!url){toastMsg("Media URL not available.");return;}
+  try{
+    toastMsg("Preparing download…");
+    const response=await fetch(url,{mode:"cors",credentials:"omit",cache:"no-store"});
+    if(!response.ok)throw new Error(`HTTP ${response.status}`);
+    const blob=await response.blob();
+    const objectUrl=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=objectUrl;
+    a.download=filename;
+    a.rel="noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(objectUrl),1500);
+    toastMsg("Download started");
+  }catch(e){
+    console.warn("Direct download failed:",e);
+    // Cross-origin fallback: opening the original secure URL still lets the
+    // browser save the file manually when a forced download is blocked.
+    const a=document.createElement("a");
+    a.href=url;
+    a.target="_blank";
+    a.rel="noopener";
+    a.download=filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    toastMsg("Opened media. Use Save/Download if the browser blocks automatic download.");
+  }
+}
+
+function addMediaActions(parent,d,{open=false}={}){
+  const row=document.createElement("div");
+  row.className="media-download-row";
+
+  if(open){
+    const openBtn=document.createElement("button");
+    openBtn.type="button";
+    openBtn.className="media-open-btn";
+    openBtn.textContent="🔍 View full";
+    openBtn.onclick=()=>openMediaViewer(d);
+    row.appendChild(openBtn);
+  }
+
+  const dl=document.createElement("button");
+  dl.type="button";
+  dl.className="media-download-btn";
+  dl.textContent="⬇️ Download";
+  dl.onclick=()=>downloadMedia(d.url,mediaFileName(d,"media"));
+  row.appendChild(dl);
+
+  parent.appendChild(row);
+}
+
+function openMediaViewer(d){
+  if(!d?.url)return toastMsg("Media URL not available.");
+  const viewer=document.getElementById("mediaViewer");
+  const content=document.getElementById("mediaViewerContent");
+  const title=document.getElementById("mediaViewerTitle");
+  const download=document.getElementById("mediaViewerDownload");
+  const open=document.getElementById("mediaViewerOpen");
+  if(!viewer||!content||!title||!download||!open)return;
+
+  content.innerHTML="";
+  title.textContent=d.fileName||"Media";
+  open.href=d.url;
+  download.onclick=()=>downloadMedia(d.url,mediaFileName(d,"media"));
+
+  const type=d.type;
+  if(type==="image"){
+    const img=document.createElement("img");
+    img.className="media-viewer-content";
+    img.src=d.url; img.alt=d.fileName||"Image";
+    content.appendChild(img);
+  }else if(type==="video"){
+    const video=document.createElement("video");
+    video.className="media-viewer-content media-viewer-video";
+    video.controls=true; video.autoplay=false; video.playsInline=true;
+    video.preload="metadata";
+    const source=document.createElement("source");
+    source.src=d.url; if(d.mimeType)source.type=d.mimeType;
+    video.appendChild(source);
+    content.appendChild(video);
+  }else if(type==="audio"){
+    const audio=document.createElement("audio");
+    audio.className="media-viewer-audio";
+    audio.controls=true; audio.preload="metadata";
+    audio.src=d.playbackUrl||d.url;
+    content.appendChild(audio);
+  }else{
+    const isPdf=(d.mimeType||"").toLowerCase()==="application/pdf" || /\.pdf$/i.test(d.fileName||"");
+    if(isPdf){
+      const iframe=document.createElement("iframe");
+      iframe.className="media-viewer-pdf";
+      iframe.src=d.url+"#toolbar=1&navpanes=0";
+      iframe.title=d.fileName||"PDF";
+      content.appendChild(iframe);
+    }else{
+      const box=document.createElement("div");
+      box.className="media-fallback";
+      box.innerHTML=`📄 <strong>${esc(d.fileName||"File")}</strong>`;
+      content.appendChild(box);
+    }
+  }
+
+  viewer.classList.remove("hidden");
+  viewer.setAttribute("aria-hidden","false");
+}
+
+function closeMediaViewer(){
+  const viewer=document.getElementById("mediaViewer");
+  const content=document.getElementById("mediaViewerContent");
+  if(content)content.innerHTML="";
+  if(viewer){
+    viewer.classList.add("hidden");
+    viewer.setAttribute("aria-hidden","true");
+  }
+}
+
+document.getElementById("mediaViewerClose")?.addEventListener("click",closeMediaViewer);
+document.getElementById("mediaViewer")?.addEventListener("click",e=>{
+  if(e.target.id==="mediaViewer")closeMediaViewer();
+});
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape")closeMediaViewer();
+});
+
 function renderMessage(d){
   const sent=d.senderId===currentUser.uid;
   const wrap=document.createElement("div");wrap.className="message-wrap "+(sent?"sent":"received");wrap.dataset.id=d.id;
@@ -1565,10 +1758,55 @@ function renderMessage(d){
   }
   const bubble=document.createElement("div");bubble.className="message";
   if(d.replyTo)bubble.innerHTML+=`<div class="reply-preview">${esc(d.replyTo.senderName||"User")}: ${esc(d.replyTo.text||"Attachment")}</div>`;
-  if(d.type==="image")bubble.innerHTML+=`<img class="media" src="${escAttr(d.url)}" alt="${escAttr(d.fileName||"image")}">`;
-  else if(d.type==="file")bubble.innerHTML+=`<div class="file-card">📄 <a href="${escAttr(d.url)}" target="_blank" rel="noopener">${esc(d.fileName||"File")}</a></div>`;
-  else if(d.type==="audio")bubble.innerHTML+=`<audio controls src="${escAttr(d.url)}"></audio>`;
-  else bubble.innerHTML+=esc(d.text||"");
+
+  if(d.type==="image"){
+    const img=document.createElement("img");
+    img.className="media media-clickable";img.src=d.url;img.alt=d.fileName||"image";img.loading="lazy";
+    img.title="Click to view full image";
+    img.onclick=()=>openMediaViewer(d);
+    img.onerror=()=>{img.replaceWith(mediaFallback(d.url,d.fileName||"Image"));};
+    bubble.appendChild(img);
+    addMediaActions(bubble,d,{open:true});
+  }else if(d.type==="video"){
+    const video=document.createElement("video");
+    video.className="chat-video";video.controls=true;video.playsInline=true;video.preload="metadata";
+    const source=document.createElement("source");source.src=d.url;if(d.mimeType)source.type=d.mimeType;video.appendChild(source);
+    video.onerror=()=>{video.replaceWith(mediaFallback(d.url,d.fileName||"Video"));};
+    bubble.appendChild(video);
+    addMediaActions(bubble,d,{open:true});
+  }else if(d.type==="audio"){
+    const audio=document.createElement("audio");
+    audio.className="chat-audio";audio.controls=true;audio.preload="metadata";audio.src=d.playbackUrl||d.url;
+    audio.onerror=()=>{
+      if(d.url && audio.src!==d.url){audio.src=d.url;audio.load();return;}
+      const fallback=mediaFallback(d.url,d.fileName||"Voice message");audio.replaceWith(fallback);
+    };
+    bubble.appendChild(audio);
+    addMediaActions(bubble,d,{open:true});
+  }else if(d.type==="file"){
+    const fileCard=document.createElement("div");fileCard.className="file-card file-card-pdf";
+    const isPdf=(d.mimeType||"").toLowerCase()==="application/pdf" || /\.pdf$/i.test(d.fileName||"");
+    if(isPdf){
+      const pdf=document.createElement("iframe");pdf.className="chat-pdf";pdf.src=d.url+"#toolbar=1&navpanes=0";pdf.title=d.fileName||"PDF";pdf.loading="lazy";
+      fileCard.appendChild(pdf);
+      const bar=document.createElement("div");bar.className="file-card-bar";
+      bar.innerHTML=`📄 <strong>${esc(d.fileName||"PDF document")}</strong>`;
+      fileCard.appendChild(bar);
+      const actions=document.createElement("div");actions.className="media-download-row";
+      const view=document.createElement("button");view.type="button";view.className="media-open-btn";view.textContent="🔍 View full";
+      view.onclick=()=>openMediaViewer(d);
+      const open=document.createElement("a");open.className="media-open-btn";open.textContent="↗️ Open";open.href=d.url;open.target="_blank";open.rel="noopener";
+      const dl=document.createElement("button");dl.type="button";dl.className="media-download-btn";dl.textContent="⬇️ Download";
+      dl.onclick=()=>downloadMedia(d.url,mediaFileName(d,"document.pdf"));
+      actions.append(view,open,dl);fileCard.appendChild(actions);
+    }else{
+      const row=document.createElement("div");row.className="file-card";
+      row.innerHTML=`📄 <strong style="overflow:hidden;text-overflow:ellipsis">${esc(d.fileName||"File")}</strong>`;
+      fileCard.appendChild(row);
+      addMediaActions(fileCard,d,{open:true});
+    }
+    bubble.appendChild(fileCard);
+  }else bubble.innerHTML+=esc(d.text||"");
   const t=d.createdAt?.toDate?formatTime(d.createdAt.toDate()):"...";
   const tick=sent?`<span class="ticks ${d.seen?"seen":""}">${d.seen||d.delivered?"✓✓":"✓"}</span>`:"";
   bubble.innerHTML+=`<span class="message-time">${t}${tick}</span>`;
@@ -1709,32 +1947,77 @@ async function uploadAttachment(file){
     await addDoc(collection(db,"chats",selectedChat.id,"messages"),{
       type,url,fileName:file.name,mimeType:file.type,size:file.size,senderId:currentUser.uid,
       receiverId:selectedUser.isGroup?null:selectedUser.id,senderName:myName.textContent,seen:false,createdAt:serverTimestamp(),
-      storageProvider:"cloudinary"
+      storageProvider:"cloudinary",resourceType:uploaded.resource_type||null,publicId:uploaded.public_id||null
     });toastMsg("Uploaded");
   }catch(e){console.error("Cloudinary attachment upload:",e);toastMsg("Upload failed: "+(e?.message||"Cloudinary error"));}
 }
 
 recordBtn.onclick=async()=>{
   if(!selectedChat)return toastMsg("Select a chat first");
-  if(isRecording){mediaRecorder.stop();isRecording=false;recordBtn.classList.remove("recording");recordBtn.textContent="🎤";return}
+  if(isRecording){
+    try{mediaRecorder.stop();}catch(_){}
+    isRecording=false;recordBtn.classList.remove("recording");recordBtn.textContent="🎤";
+    return;
+  }
   if(!navigator.mediaDevices?.getUserMedia)return toastMsg("Voice recording is not supported.");
   try{
-    const stream=await navigator.mediaDevices.getUserMedia({audio:true});voiceChunks=[];
-    mediaRecorder=new MediaRecorder(stream);isRecording=true;recordBtn.classList.add("recording");recordBtn.textContent="⏹";
-    mediaRecorder.ondataavailable=e=>{if(e.data.size)voiceChunks.push(e.data)};
-    mediaRecorder.onstop=async()=>{stream.getTracks().forEach(t=>t.stop());const blob=new Blob(voiceChunks,{type:mediaRecorder.mimeType||"audio/webm"});await uploadVoice(blob)};
-    mediaRecorder.start();
-  }catch(e){toastMsg("Microphone permission denied.")}
+    const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+    voiceChunks=[];
+    const mimeCandidates=["audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus"];
+    const mimeType=mimeCandidates.find(t=>MediaRecorder.isTypeSupported?.(t))||"";
+    mediaRecorder=mimeType?new MediaRecorder(stream,{mimeType}):new MediaRecorder(stream);
+    const recorderMime=mediaRecorder.mimeType||mimeType||"audio/webm";
+    isRecording=true;recordBtn.classList.add("recording");recordBtn.textContent="⏹";
+    mediaRecorder.ondataavailable=e=>{if(e.data&&e.data.size)voiceChunks.push(e.data)};
+    mediaRecorder.onerror=e=>{console.error("MediaRecorder error:",e);toastMsg("Voice recorder error.");};
+    mediaRecorder.onstop=async()=>{
+      stream.getTracks().forEach(t=>t.stop());
+      try{
+        const blob=new Blob(voiceChunks,{type:recorderMime});
+        if(!blob.size)return toastMsg("No voice audio was recorded.");
+        await uploadVoice(blob,recorderMime);
+      }catch(e){console.error(e);toastMsg("Voice upload failed: "+(e?.message||"Unknown error"));}
+    };
+    mediaRecorder.start(250);
+  }catch(e){console.error("Microphone:",e);toastMsg("Microphone permission denied or unavailable.");}
 };
-async function uploadVoice(blob){
+
+function cloudinaryAudioPlaybackUrl(url){
+  if(!url)return url;
   try{
-    const file=new File([blob],`voice-message-${Date.now()}.webm`,{type:blob.type||"audio/webm"});
+    const u=new URL(url);
+    if(!u.hostname.includes("res.cloudinary.com")||!u.pathname.includes("/video/upload/"))return url;
+    const marker="/video/upload/";
+    const idx=u.pathname.indexOf(marker);
+    if(idx<0)return url;
+    const rest=u.pathname.slice(idx+marker.length);
+    if(rest.startsWith("f_mp3/"))return url;
+    const lastSlash=rest.lastIndexOf("/");
+    const dir=lastSlash>=0?rest.slice(0,lastSlash+1):"";
+    let file=lastSlash>=0?rest.slice(lastSlash+1):rest;
+    file=file.replace(/\.[^.\/]+$/,".mp3");
+    u.pathname=u.pathname.slice(0,idx+marker.length)+"f_mp3/"+dir+file;
+    return u.toString();
+  }catch(_){return url;}
+}
+
+async function uploadVoice(blob,mimeType){
+  try{
+    const ext=mimeType.includes("ogg")?"ogg":"webm";
+    const file=new File([blob],`voice-message-${Date.now()}.${ext}`,{type:mimeType||blob.type||"audio/webm"});
     const uploaded=await uploadMedia(file,`shaanchat/voice/${selectedChat.id}/${currentUser.uid}`);
     const url=uploaded.secure_url;
-    await addDoc(collection(db,"chats",selectedChat.id,"messages"),{type:"audio",url,fileName:"voice-message.webm",senderId:currentUser.uid,receiverId:selectedUser.isGroup?null:selectedUser.id,delivered:false,seen:false,createdAt:serverTimestamp(),storageProvider:"cloudinary"});
+    const playbackUrl=cloudinaryAudioPlaybackUrl(url);
+    await addDoc(collection(db,"chats",selectedChat.id,"messages"),{
+      type:"audio",url,playbackUrl,fileName:file.name,mimeType:mimeType||file.type,
+      resourceType:uploaded.resource_type||"video",publicId:uploaded.public_id||null,
+      senderId:currentUser.uid,receiverId:selectedUser.isGroup?null:selectedUser.id,
+      delivered:false,seen:false,createdAt:serverTimestamp(),storageProvider:"cloudinary"
+    });
     toastMsg("Voice sent");
   }catch(e){console.error("Cloudinary voice upload:",e);toastMsg("Voice upload failed: "+(e?.message||"Cloudinary error"));}
 }
+
 
 $("profilePhoto").onchange=async()=>{
   const file=$("profilePhoto").files?.[0];
