@@ -38,7 +38,7 @@ const incomingCallModal=$("incomingCallModal"),incomingCallAvatar=$("incomingCal
 const acceptIncomingBtn=$("acceptIncomingBtn"),rejectIncomingBtn=$("rejectIncomingBtn");
 const activeCallModal=$("activeCallModal"),activeCallName=$("activeCallName"),activeCallStatus=$("activeCallStatus");
 const activeCallAvatar=$("activeCallAvatar"),audioCallLabel=$("audioCallLabel"),videoStage=$("videoStage"),audioCallVisual=$("audioCallVisual"),callTimerEl=$("callTimer");
-const remoteVideo=$("remoteVideo"),localVideo=$("localVideo"),muteCallBtn=$("muteCallBtn"),cameraCallBtn=$("cameraCallBtn"),speakerCallBtn=$("speakerCallBtn"),flipCameraBtn=$("flipCameraBtn"),endCallBtn=$("endCallBtn"),incomingCallRinging=$("incomingCallRinging");
+const remoteVideo=$("remoteVideo"),localVideo=$("localVideo"),muteCallBtn=$("muteCallBtn"),cameraCallBtn=$("cameraCallBtn"),speakerCallBtn=$("speakerCallBtn"),enableCallSoundBtn=$("enableCallSoundBtn"),flipCameraBtn=$("flipCameraBtn"),endCallBtn=$("endCallBtn"),incomingCallRinging=$("incomingCallRinging");
 
 let isRegister=false,currentUser=null,selectedUser=null,selectedChat=null,unsubscribeMessages=null,unsubscribeChat=null,unsubscribeTyping=null;
 let allUsers=[],loadedMessages=[],replyingTo=null,typingTimer=null,mediaRecorder=null,voiceChunks=[],isRecording=false;
