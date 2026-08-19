@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="theme-color" content="#070b14">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>ShaanChat Pro</title>
+<link rel="stylesheet" href="./styles.css">
+<script>
+tailwind.config={theme:{extend:{colors:{shaan:{cyan:"#00eaff",purple:"#7c3cff",bg:"#070b14"}},backdropBlur:{xs:"2px"}}}};
+</script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+</head>
+<body class="min-h-screen antialiased">
+
+<section class="auth-screen" id="authScreen">
+  <div class="auth-box">
+    <div class="logo">shaan<span>Chat</span></div>
+    <div class="subtitle">Private real-time messaging</div>
+    <div id="registerFields" class="hidden">
+      <input class="input" id="registerName" placeholder="Your name" maxlength="40">
+      <input class="input" id="registerUsername" placeholder="Username (e.g. shaan123)" maxlength="20" autocomplete="username">
+    </div>
+    <input class="input" id="email" type="email" placeholder="Email address">
+    <input class="input" id="password" type="password" placeholder="Password">
+    <button class="btn auth-main-btn" id="authBtn">Login</button>
+    <button class="small-btn" id="authQrBtn" style="width:100%;margin-top:10px;padding:12px">▣ ShaanChat Install QR</button>
+    <div class="switch"><span id="switchText">Create a new account</span></div>
+    <p class="error" id="authError"></p>
+  </div>
+</section>
+
+<section class="app" id="app">
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <div class="brand">shaan<span>Chat</span></div>
+      <div class="me">
+        <div class="avatar" id="myAvatar">U</div>
+        <div class="me-info"><strong id="myName">User</strong><small id="myUsername" style="display:block;color:#8490a5;margin-top:2px"></small><small id="myPresence">● Online</small></div>
+        <button class="logout" id="logoutBtn">Logout</button>
+      </div>
+      <div class="profile-actions settings-launcher">
+        <button class="small-btn settings-main-btn" id="settingsBtn">⚙️ Settings</button>
+      </div>
+      <input class="search" id="searchUsers" placeholder="Search people by name or @username...">
+    </div>
+    <div class="users" id="usersList"></div>
+  </aside>
+
+  <main class="chat">
+    <header class="chat-header">
+      <button class="mobile-back" id="backBtn">←</button>
+      <div class="chat-avatar" id="chatAvatar">?</div>
+      <div class="chat-head-info">
+        <div class="chat-title" id="chatName">Select a user</div>
+        <div id="chatUsername" style="font-size:11px;color:#00eaff;margin-top:2px"></div>
+        <div class="chat-status" id="chatStatus">Start a conversation</div>
+      </div>
+      <div class="chat-tools">
+        <button class="icon-btn" id="searchMessagesBtn" title="Search messages">🔎</button>
+        <button class="icon-btn hidden" id="voiceCallBtn" title="Voice call">📞</button>
+        <button class="icon-btn hidden" id="videoCallBtn" title="Video call">📹</button>
+        <button class="icon-btn hidden" id="chatSecurityBtn" title="Chat settings">⚙️</button><button class="icon-btn private-chat-btn" id="privateChatBtn" title="Private chat">🔐</button>
+        <button class="icon-btn hidden" id="groupSettingsBtn" title="Group settings">👥</button><button class="icon-btn hidden" id="blockUserBtn" title="Block user">🚫</button>
+      </div>
+    </header>
+    <div class="messages" id="messages"><div class="empty">Select a user to start chatting 💬</div></div>
+    <div class="typing" id="typingIndicator"></div>
+    <div class="reply-bar hidden" id="replyBar"><div id="replyText"></div><button class="close" id="cancelReply">✕</button></div>
+    <div class="composer">
+      <input type="file" id="fileInput" hidden multiple>
+      <button class="attach" id="attachBtn" title="Image/file">📎</button>
+      <button class="attach" id="recordBtn" title="Voice message">🎤</button>
+      <input class="message-input" id="messageInput" placeholder="Type a message..." disabled>
+      <button class="send" id="sendBtn" disabled>➤</button>
+    </div>
+  </main>
+</section>
+
+<div class="modal hidden" id="profileModal">
+  <div class="modal-card">
+    <div class="modal-title">Profile</div>
+    <div class="profile-photo-preview profile-avatar-click" id="profilePhotoPreview">U</div>
+    <div class="profile-photo-hint">Tap your photo to view it</div>
+    <div class="qr-actions"><button class="qr-action primary" id="profileQrBtn">▣ My Profile QR</button><button class="qr-action" id="scanQrBtn">📷 Scan QR</button></div>
+    <input class="input" id="profileName" placeholder="Name">
+    <input class="input" id="profileUsername" placeholder="Username (e.g. shaan123)" maxlength="20">
+    <input type="file" class="input" id="profilePhoto" accept="image/*">
+    <div class="modal-actions"><button class="small-btn" data-close="profileModal">Cancel</button><button class="small-btn" id="saveProfile">Save</button></div>
+  </div>
+</div>
+
+
+<div class="modal hidden" id="scHeaderActionsModal">
+  <div class="modal-card settings-card">
+    <div class="settings-head">
+      <div>
+        <div class="modal-title" style="margin-bottom:4px">🧩 Chat Header & Actions</div>
+        <div class="settings-subtitle">Choose which buttons appear at the top of every chat</div>
+      </div>
+      <button class="settings-close" id="scCloseHeaderActions" aria-label="Close">✕</button>
+    </div>
+
+    <div class="sc-header-settings-note">
+      These controls only change the ShaanChat header. Call, group and private-chat buttons
+      will still follow their normal availability rules for the selected chat.
+    </div>
+
+    <div class="settings-list" id="scHeaderActionsList">
+      <div class="settings-item sc-action-setting" data-header-action="favourite">
+        <span class="settings-icon">⭐</span>
+        <span class="settings-item-text"><strong>Favourite</strong><small>Quickly favourite the current chat</small></span>
+        <button class="sc-action-toggle on" type="button" aria-label="Toggle Favourite"></button>
+      </div>
+
+      <div class="settings-item sc-action-setting" data-header-action="more">
+        <span class="settings-icon">⋮</span>
+        <span class="settings-item-text"><strong>More menu</strong><small>Focus, draft, chat ID, shortcuts and export</small></span>
+        <button class="sc-action-toggle on" type="button" aria-label="Toggle More menu"></button>
+      </div>
+
+      <div class="settings-item sc-action-setting" data-header-action="search">
+        <span class="settings-icon">🔎</span>
+        <span class="settings-item-text"><strong>Search messages</strong><small>Search messages loaded in the current chat</small></span>
+        <button class="sc-action-toggle on" type="button" aria-label="Toggle Search messages"></button>
+      </div>
+
+      <div class="settings-item sc-action-setting" data-header-action="voice">
+        <span class="settings-icon">📞</span>
+        <span class="settings-item-text"><strong>Voice call</strong><small>Show the voice call button in person chats</small></span>
+        <button class="sc-action-toggle on" type="button" aria-label="Toggle Voice call"></button>
+      </div>
+
+      <div class="settings-item sc-action-setting" data-header-action="video">
+        <span class="settings-icon">📹</span>
+        <span class="settings-item-text"><strong>Video call</strong><small>Show the video call button in person chats</small></span>
+        <button class="sc-action-toggle on" type="button" aria-label="Toggle Video call"></button>
+      </div>
+
+      <div class="settings-item sc-action-setting" data-header-action="security">
+        <span class="settings-icon">⚙️</span>
+        <span class="settings-item-text"><strong>Chat settings</strong><small>Block, report and chat lock controls</small></span>
+        <button class="sc-action-toggle on" type="button" aria-label="Toggle Chat settings"></button>
+      </div>
+
+      <div class="settings-item sc-action-setting" data-header-action="private">
+        <span class="settings-icon">🔐</span>
+        <span class="settings-item-text"><strong>Private chat</strong><small>Private-chat controls for person conversations</small></span>
+        <button class="sc-action-toggle on" type="button" aria-label="Toggle Private chat"></button>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="small-btn" id="scResetHeaderActions">Reset</button>
+      <button class="small-btn" id="scDoneHeaderActions">Done</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal hidden" id="settingsModal">
+  <div class="modal-card settings-card">
+    <div class="settings-head">
+      <div>
+        <div class="modal-title" style="margin-bottom:4px">Settings</div>
+        <div class="settings-subtitle">Manage your ShaanChat account</div>
+      </div>
+      <button class="settings-close" id="closeSettings" aria-label="Close">✕</button>
+    </div>
+
+    <div class="settings-list">
+      <button class="settings-item" id="profileBtn">
+        <span class="settings-icon">👤</span>
+        <span class="settings-item-text"><strong>Profile</strong><small>Edit name, username & profile photo</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
+
+      <button class="settings-item" id="qrCenterBtn">
+        <span class="settings-icon">▣</span>
+        <span class="settings-item-text"><strong>QR Center</strong><small>Share your profile QR or let friends install ShaanChat</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
+
+      <button class="settings-item" id="groupBtn">
+        <span class="settings-icon">👥</span>
+        <span class="settings-item-text"><strong>New group</strong><small>Create a group chat</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
+
+      <button class="settings-item" id="themeBtn">
+        <span class="settings-icon">🌙</span>
+        <span class="settings-item-text"><strong>Theme</strong><small>Switch between dark and light mode</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
+
+      <button class="settings-item" id="notifyBtn">
+        <span class="settings-icon">🔔</span>
+        <span class="settings-item-text"><strong>Notifications</strong><small>Enable browser push notifications</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
+
+      <button class="settings-item" id="peopleVisibilityBtn">
+        <span class="settings-icon" id="peopleVisibilityIcon">👁️</span>
+        <span class="settings-item-text"><strong id="peopleVisibilityTitle">Hide People</strong><small id="peopleVisibilityDesc">Hide the People list from the sidebar</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
+
+      <button class="settings-item" id="privacySecurityBtn"><span class="settings-icon">🔐</span><span class="settings-item-text"><strong>Privacy & Security</strong><small>Blocking, privacy, chat lock & account security</small></span><span class="settings-arrow">›</span></button>
+      <button class="settings-item" id="scHeaderActionsBtn"><span class="settings-icon">🧩</span><span class="settings-item-text"><strong>Chat & Call Controls</strong><small>Voice call, video call, search, chat settings & header buttons</small></span><span class="settings-arrow">›</span></button>
+      <div class="settings-divider"></div>
+
+      
+<button class="settings-item settings-logout" id="settingsLogoutBtn">
+        <span class="settings-icon">↪️</span>
+        <span class="settings-item-text"><strong>Logout</strong><small>Sign out of this account</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="modal hidden" id="privacyModal"><div class="modal-card settings-card"><div class="settings-head"><div><div class="modal-title" style="margin-bottom:4px">🔐 Privacy & Security</div><div class="settings-subtitle">Control your privacy and account protection</div></div><button class="settings-close" id="closePrivacy">✕</button></div><div class="settings-list"><button class="settings-item" id="blockedUsersBtn"><span class="settings-icon">🚫</span><span class="settings-item-text"><strong>Blocked Users</strong><small>Block or unblock people</small></span><span class="settings-arrow">›</span></button><button class="settings-item" id="reportUserBtn"><span class="settings-icon">🚩</span><span class="settings-item-text"><strong>Report User</strong><small>Report spam or abuse</small></span><span class="settings-arrow">›</span></button><div class="permission-list"><div class="modal-title" style="font-size:15px;margin-bottom:6px">👁️ Last Seen</div><select class="input" id="lastSeenPrivacy"><option value="everyone">Everyone</option><option value="contacts">My Contacts</option><option value="nobody">Nobody</option></select><div class="modal-title" style="font-size:15px;margin-bottom:6px">🟢 Online Status</div><select class="input" id="onlinePrivacy"><option value="everyone">Everyone</option><option value="contacts">My Contacts</option><option value="nobody">Nobody</option></select></div><button class="settings-item" id="chatLockBtn"><span class="settings-icon">🔒</span><span class="settings-item-text"><strong>Chat Lock</strong><small>Lock or unlock the selected chat</small></span><span class="settings-arrow">›</span></button><button class="settings-item" id="appPinBtn"><span class="settings-icon">🔑</span><span class="settings-item-text"><strong>App Lock / PIN</strong><small>Set, change or remove your PIN</small></span><span class="settings-arrow">›</span></button><button class="settings-item" id="accountSecurityBtn"><span class="settings-icon">🛡️</span><span class="settings-item-text"><strong>Account Security</strong><small>Review email and send password reset</small></span><span class="settings-arrow">›</span></button><div class="modal-actions"><button class="small-btn" id="savePrivacy">Save privacy</button><button class="small-btn" id="donePrivacy">Done</button></div></div></div></div>
+
+<div class="modal hidden" id="chatSecurityModal"><div class="modal-card settings-card"><div class="settings-head"><div><div class="modal-title" style="margin-bottom:4px">⚙️ Chat Settings</div><div class="settings-subtitle">Privacy & actions for this chat</div></div><button class="settings-close" id="closeChatSecurity">✕</button></div><div class="settings-list"><button class="settings-item" id="chatBlockAction"><span class="settings-icon">🚫</span><span class="settings-item-text"><strong id="chatBlockActionTitle">Block User</strong><small id="chatBlockActionSub">Stop this user from contacting you</small></span><span class="settings-arrow">›</span></button><button class="settings-item" id="chatReportAction"><span class="settings-icon">🚩</span><span class="settings-item-text"><strong>Report User</strong><small>Report spam, abuse or unwanted behaviour</small></span><span class="settings-arrow">›</span></button><button class="settings-item" id="chatLockAction"><span class="settings-icon">🔒</span><span class="settings-item-text"><strong id="chatLockActionTitle">Chat Lock</strong><small id="chatLockActionSub">Lock or unlock this conversation</small></span><span class="settings-arrow">›</span></button></div></div></div>
+
+<div class="modal hidden" id="appLockModal"><div class="modal-card settings-card"><div class="settings-head"><div><div class="modal-title" style="margin-bottom:4px">🔑 App Lock / PIN</div><div class="settings-subtitle">Protect ShaanChat with a PIN</div></div><button class="settings-close" id="closeAppLock">✕</button></div><div class="permission-list" style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><span style="font-size:12px;color:#cbd4e3">App Lock status</span><strong id="appLockStatus" style="color:#48e6a1">OFF</strong></div></div><div class="settings-list"><button class="settings-item" id="setAppPinVisible"><span class="settings-icon">🔐</span><span class="settings-item-text"><strong>Set / Change PIN</strong><small>Create a new 4–6 digit app PIN</small></span><span class="settings-arrow">›</span></button><button class="settings-item settings-logout" id="removeAppPinVisible"><span class="settings-icon">🗑️</span><span class="settings-item-text"><strong>Remove App Lock</strong><small>Disable PIN protection</small></span><span class="settings-arrow">›</span></button></div></div></div>
+
+<div class="modal hidden" id="accountSecurityModal"><div class="modal-card settings-card"><div class="settings-head"><div><div class="modal-title" style="margin-bottom:4px">🛡️ Account Security</div><div class="settings-subtitle">Review your account and password recovery</div></div><button class="settings-close" id="closeAccountSecurity">✕</button></div><div class="permission-list"><div style="font-size:12px;color:#8490a5;margin-bottom:5px">Signed-in email</div><div id="securityEmail" style="font-size:14px;font-weight:700;word-break:break-all"></div></div><div class="settings-list" style="margin-top:10px"><button class="settings-item" id="sendResetVisible"><span class="settings-icon">📧</span><span class="settings-item-text"><strong>Send Password Reset Email</strong><small>Send a Firebase password reset link to this email</small></span><span class="settings-arrow">›</span></button><button class="settings-item" id="verifyEmailVisible"><span class="settings-icon">✅</span><span class="settings-item-text"><strong>Email Verification</strong><small id="verifyEmailSub">Check verification status / resend email</small></span><span class="settings-arrow">›</span></button></div><div class="modal-actions"><button class="small-btn" id="closeAccountSecurity2">Close</button></div></div></div>
+
+<div class="modal hidden" id="groupModal">
+  <div class="modal-card">
+    <div class="modal-title">Create group</div>
+    <input class="input" id="groupName" placeholder="Group name" maxlength="50">
+    <div class="check-list" id="groupUsers"></div>
+    <div class="modal-actions"><button class="small-btn" data-close="groupModal">Cancel</button><button class="small-btn" id="createGroup">Create</button></div>
+  </div>
+</div>
+
+<div class="modal hidden" id="searchModal">
+  <div class="modal-card">
+    <div class="modal-title">Search messages</div>
+    <input class="input" id="messageSearchInput" placeholder="Search loaded messages...">
+    <div id="messageSearchResults" style="max-height:320px;overflow:auto;color:#aeb9cb"></div>
+    <div class="modal-actions"><button class="small-btn" data-close="searchModal">Close</button></div>
+  </div>
+</div>
+
+<div class="modal hidden" id="groupSettingsModal">
+  <div class="modal-card">
+    <div class="modal-title">👥 Group Settings</div>
+    <div class="group-settings-scroll">
+      <div class="group-photo-picker">
+        <div class="group-photo-preview" id="groupPhotoPreview">G</div>
+        <input type="file" id="groupPhotoInput" accept="image/*" style="max-width:100%">
+      </div>
+
+      <input class="input" id="groupSettingsName" placeholder="Group name" maxlength="50">
+      <textarea class="input" id="groupDescription" placeholder="Group description" maxlength="200" style="min-height:80px;resize:vertical"></textarea>
+
+      <div class="modal-title" style="font-size:15px;margin-top:8px">⚙️ Admin permissions</div>
+      <div class="permission-list">
+        <label class="permission-row"><span>Members can add people</span><input type="checkbox" id="permAddMembers"></label>
+        <label class="permission-row"><span>Admins can remove people</span><input type="checkbox" id="permRemoveMembers" checked></label>
+        <label class="permission-row"><span>Admins can edit group info</span><input type="checkbox" id="permEditInfo" checked></label>
+      </div>
+
+      <div class="modal-title" style="font-size:15px;margin-top:16px">👥 Members</div>
+      <div class="check-list" id="groupMembersList"></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="small-btn" id="leaveGroupBtn" style="color:#ff667d">🚪 Leave</button>
+      <button class="small-btn" id="inviteGroupBtn">🔗 Invite</button>
+      <button class="small-btn" id="groupInfoBtn">ℹ️ Info</button>
+      <button class="small-btn" data-close="groupSettingsModal">Close</button>
+      <button class="small-btn" id="saveGroupSettings">Save</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Incoming call -->
+<div class="call-modal hidden" id="incomingCallModal">
+  <div class="call-card">
+    <div class="call-avatar" id="incomingCallAvatar">U</div>
+    <div class="call-title" id="incomingCallName">Incoming call</div>
+    <div class="call-subtitle" id="incomingCallType">Voice call</div>
+    <div class="call-ringing-text" id="incomingCallRinging">🔔 Ringing…</div><div style="color:#8490a5;font-size:10px;margin-top:6px">If you hear no sound, tap Accept once to enable call audio.</div>
+    <div class="call-buttons">
+      <button class="call-btn reject" id="rejectIncomingBtn" title="Reject">✕</button>
+      <button class="call-btn accept" id="acceptIncomingBtn" title="Accept">✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- Active call -->
+<div class="call-modal hidden" id="activeCallModal">
+  <div class="call-card active-call-card">
+    <div class="call-title" id="activeCallName">Call</div>
+    <div class="call-status-text" id="activeCallStatus">Connecting…</div><div class="call-timer" id="callTimer">00:00</div>
+    <div class="video-stage hidden" id="videoStage">
+      <video class="remote-video" id="remoteVideo" autoplay playsinline></video>
+      <video class="local-video" id="localVideo" autoplay muted playsinline></video>
+    </div>
+    <div class="audio-call-visual" id="audioCallVisual">
+      <div class="call-avatar" id="activeCallAvatar">U</div>
+      <div class="call-subtitle" id="audioCallLabel">Voice call</div>
+    </div>
+    <div class="call-control-bar">
+      <button class="call-control" id="muteCallBtn" title="Mute">🎤</button>
+      <button class="call-control" id="cameraCallBtn" title="Camera" >📹</button>
+      <button class="call-control" id="speakerCallBtn" title="Speaker">🔊</button><button class="call-control" id="enableCallSoundBtn" title="Enable sound">🔈</button>
+      <button class="call-control hidden" id="flipCameraBtn" title="Switch camera">🔄</button>
+      <button class="call-control end" id="endCallBtn" title="End call">📞</button>
+    </div>
+  </div>
+</div>
+
+
+
+<!-- Chat media viewer -->
+<div class="media-viewer hidden" id="mediaViewer" aria-hidden="true">
+  <div class="media-viewer-card" id="mediaViewerCard">
+    <button class="media-viewer-close" id="mediaViewerClose" aria-label="Close">✕</button>
+    <div id="mediaViewerContent"></div>
+    <div class="media-viewer-title" id="mediaViewerTitle"></div>
+    <div class="media-viewer-actions">
+      <button class="media-download-btn" id="mediaViewerDownload" type="button">⬇️ Download</button>
+      <a class="media-open-btn" id="mediaViewerOpen" href="#" target="_blank" rel="noopener">↗️ Open</a>
+    </div>
+  </div>
+</div>
+
+<div class="profile-image-modal hidden" id="profileImageModal">
+  <div class="profile-image-card">
+    <button class="profile-image-close" id="closeProfileImage" aria-label="Close">✕</button>
+    <img class="profile-image-large" id="profileImageLarge" alt="Profile photo">
+    <div class="profile-image-name" id="profileImageName"></div>
+  </div>
+</div>
+
+<div class="app-lock-screen hidden" id="appLockScreen"><div class="app-lock-card"><div class="app-lock-icon">🔐</div><h2>ShaanChat Locked</h2><p>Enter your App PIN to continue.</p><input class="app-lock-input" id="appUnlockPin" type="password" inputmode="numeric" maxlength="6" placeholder="••••"><div class="app-lock-error" id="appUnlockError"></div><button class="app-lock-btn" id="unlockAppBtn">Unlock</button></div></div>
+
+
+<!-- Private Chat Settings -->
+<div class="modal hidden" id="privateChatModal">
+  <div class="modal-card settings-card private-modal-card">
+    <div class="settings-head">
+      <div><div class="modal-title" style="margin-bottom:4px">🔐 Private Chat</div><div class="settings-subtitle">Extra privacy for this conversation</div></div>
+      <button class="settings-close" id="closePrivateChat">✕</button>
+    </div>
+    <div class="private-status">
+      <div><strong id="privateChatStatus">Private mode OFF</strong><small id="privateChatStatusSub">Normal chat behaviour</small></div>
+      <span id="privateChatBadge" class="private-badge">🔓 OFF</span>
+    </div>
+    <div class="private-options">
+      <label class="private-option"><span class="po-icon">🔒</span><span class="po-text"><strong>Private mode</strong><small>Keep this chat out of the normal local private-chat view until unlocked.</small></span><input type="checkbox" id="privateModeToggle"></label>
+      <label class="private-option"><span class="po-icon">🔔</span><span class="po-text"><strong>Hide message preview</strong><small>Browser notifications should show a generic message instead of chat text.</small></span><input type="checkbox" id="privatePreviewToggle"></label>
+      <label class="private-option"><span class="po-icon">👻</span><span class="po-text"><strong>Disappearing messages</strong><small>Automatically hide messages on this device after the selected period.</small><select class="private-select" id="privateDisappearSelect"><option value="0">Off</option><option value="30">30 seconds</option><option value="60">1 minute</option><option value="300">5 minutes</option><option value="3600">1 hour</option><option value="86400">24 hours</option><option value="604800">7 days</option></select></span></label>
+      <label class="private-option"><span class="po-icon">📥</span><span class="po-text"><strong>Disable media auto-save</strong><small>Do not automatically save received media to device storage.</small></span><input type="checkbox" id="privateMediaToggle"></label>
+    </div>
+    <div class="private-note">Privacy note: a web app cannot guarantee protection from OS-level access, screenshots, screen recording or another person already having access to the unlocked device.</div>
+    <div class="modal-actions"><button class="small-btn" id="clearPrivateChatLocal">Clear local private settings</button><button class="small-btn" id="savePrivateChat">Save</button></div>
+  </div>
+</div>
+
+<!-- ===== QR CENTER ===== -->
+<div class="modal hidden" id="qrCenterModal">
+  <div class="modal-card" style="max-width:760px">
+    <div class="settings-head">
+      <div><div class="modal-title" style="margin-bottom:4px">▣ ShaanChat QR Center</div><div class="settings-subtitle">Add friends instantly or share ShaanChat with another phone</div></div>
+      <button class="settings-close" id="closeQrCenter">✕</button>
+    </div>
+    <div class="qr-center-grid">
+      <div class="qr-card">
+        <h3>👤 My Profile QR</h3><p>Scan this QR on another phone to open your profile and send you a friend request.</p>
+        <div class="qr-box" id="profileQrBox"></div>
+        <div class="qr-label" id="profileQrLabel">@username</div><div class="qr-url" id="profileQrUrl"></div>
+        <div class="qr-actions"><button class="qr-action primary" id="downloadProfileQr">⬇️ Save QR</button><button class="qr-action" id="shareProfileQr">↗️ Share</button></div>
+      </div>
+      <div class="qr-card">
+        <h3>📱 Install ShaanChat</h3><p>Scan this QR with a phone camera to open the ShaanChat web app. From there it can be installed as a PWA when supported.</p>
+        <div class="qr-box" id="appQrBox"></div>
+        <div class="qr-label">ShaanChat App</div><div class="qr-url" id="appQrUrl"></div>
+        <div class="qr-actions"><button class="qr-action primary" id="downloadAppQr">⬇️ Save QR</button><button class="qr-action" id="installAppBtn">📲 Install App</button></div>
+      </div>
+    </div>
+    <div class="qr-actions" style="margin-top:14px"><button class="qr-action" id="openScannerFromCenter">📷 Scan Friend QR</button><button class="qr-action" id="copyProfileQrLink">🔗 Copy Profile Link</button></div>
+    <div class="modal-actions"><button class="small-btn" id="doneQrCenter">Done</button></div>
+  </div>
+</div>
+
+<!-- ===== QR SCANNER ===== -->
+<div class="modal hidden" id="qrScannerModal">
+  <div class="modal-card" style="max-width:520px">
+    <div class="settings-head"><div><div class="modal-title" style="margin-bottom:4px">📷 Scan ShaanChat QR</div><div class="settings-subtitle">Point your camera at a profile or app QR</div></div><button class="settings-close" id="closeQrScanner">✕</button></div>
+    <div class="qr-scan-area"><div id="qrReader"></div></div>
+    <div class="qr-scan-note">Camera scanning requires HTTPS (or localhost) and browser permission. A profile QR opens the profile and sends a friend request after confirmation.</div>
+    <div class="modal-actions"><button class="small-btn" id="stopQrScanner">Stop camera</button><button class="small-btn" id="qrManualLinkBtn">Paste QR link</button></div>
+  </div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+
+<script type="module" src="./chat.js"></script>
+
+</body>
+</html>

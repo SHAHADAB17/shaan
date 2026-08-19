@@ -1,0 +1,3345 @@
+import { auth, db, firebaseApp, $, VAPID_KEY } from "./firebase-config.js";
+import { signOut } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+import {
+  collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDoc, getDocs,
+  query, orderBy, onSnapshot, serverTimestamp, arrayUnion, arrayRemove, where, deleteField
+} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+import { getMessaging, getToken, onMessage, isSupported } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-messaging.js";
+import { initAuthModule } from "./auth.js";
+import { uploadMedia, imageToCloudinary, cloudinaryAudioPlaybackUrl, cloudinaryDownloadUrl, downloadMedia as downloadMediaFile, CLOUDINARY_MAX_FILE_SIZE, drawWaveformPreview } from "./media.js";
+import { getRtcConfig, createPeerConnection } from "./webrtc.js";
+import { safeSetHTML, safeExternalUrl, scrollToMessage, initSwipeReply, initAccessibleModals } from "./ui-ux.js";
+
+
+const authScreen=$("authScreen"),app=$("app"),registerFields=$("registerFields"),registerName=$("registerName"),registerUsername=$("registerUsername");
+const email=$("email"),password=$("password"),authBtn=$("authBtn"),switchText=$("switchText"),authError=$("authError");
+const usersList=$("usersList"),messages=$("messages"),messageInput=$("messageInput"),sendBtn=$("sendBtn");
+const myName=$("myName"),myAvatar=$("myAvatar"),myPresence=$("myPresence"),myUsername=$("myUsername"),chatName=$("chatName"),chatAvatar=$("chatAvatar"),profileUsername=$("profileUsername");
+const chatStatus=$("chatStatus"),chatUsername=$("chatUsername"),logoutBtn=$("logoutBtn"),searchUsers=$("searchUsers"),backBtn=$("backBtn");
+const typingIndicator=$("typingIndicator"),replyBar=$("replyBar"),replyText=$("replyText"),cancelReply=$("cancelReply");
+const fileInput=$("fileInput"),attachBtn=$("attachBtn"),recordBtn=$("recordBtn"),toast=$("toast");
+const profileModal=$("profileModal"),groupModal=$("groupModal"),searchModal=$("searchModal");
+const qrCenterModal=$("qrCenterModal"),qrScannerModal=$("qrScannerModal"),profileQrBox=$("profileQrBox"),appQrBox=$("appQrBox");
+const privacyModal=$("privacyModal"),lastSeenPrivacy=$("lastSeenPrivacy"),onlinePrivacy=$("onlinePrivacy");
+const profilePhotoPreview=$("profilePhotoPreview"),profileImageModal=$("profileImageModal"),
+      profileImageLarge=$("profileImageLarge"),profileImageName=$("profileImageName"),
+      closeProfileImage=$("closeProfileImage");
+const groupSettingsModal=$("groupSettingsModal"),groupSettingsBtn=$("groupSettingsBtn"),blockUserBtn=$("blockUserBtn"),chatSecurityBtn=$("chatSecurityBtn");
+const groupInfoBtn=$("groupInfoBtn");
+const chatSecurityModal=$("chatSecurityModal"),chatBlockAction=$("chatBlockAction"),chatReportAction=$("chatReportAction"),chatLockAction=$("chatLockAction"),chatBlockActionTitle=$("chatBlockActionTitle"),chatBlockActionSub=$("chatBlockActionSub"),chatLockActionTitle=$("chatLockActionTitle"),chatLockActionSub=$("chatLockActionSub");
+const appLockModal=$("appLockModal"),appLockStatus=$("appLockStatus"),accountSecurityModal=$("accountSecurityModal"),securityEmail=$("securityEmail"),verifyEmailSub=$("verifyEmailSub");
+const groupMembersList=$("groupMembersList"),groupSettingsName=$("groupSettingsName");
+const groupDescription=$("groupDescription"),groupPhotoInput=$("groupPhotoInput");
+const groupPhotoPreview=$("groupPhotoPreview"),leaveGroupBtn=$("leaveGroupBtn");
+const inviteGroupBtn=$("inviteGroupBtn"),saveGroupSettings=$("saveGroupSettings");
+const permAddMembers=$("permAddMembers"),permRemoveMembers=$("permRemoveMembers"),permEditInfo=$("permEditInfo");
+const voiceCallBtn=$("voiceCallBtn"),videoCallBtn=$("videoCallBtn");
+const incomingCallModal=$("incomingCallModal"),incomingCallAvatar=$("incomingCallAvatar"),incomingCallName=$("incomingCallName"),incomingCallType=$("incomingCallType");
+const acceptIncomingBtn=$("acceptIncomingBtn"),rejectIncomingBtn=$("rejectIncomingBtn");
+const activeCallModal=$("activeCallModal"),activeCallName=$("activeCallName"),activeCallStatus=$("activeCallStatus");
+const activeCallAvatar=$("activeCallAvatar"),audioCallLabel=$("audioCallLabel"),videoStage=$("videoStage"),audioCallVisual=$("audioCallVisual"),callTimerEl=$("callTimer");
+const remoteVideo=$("remoteVideo"),localVideo=$("localVideo"),muteCallBtn=$("muteCallBtn"),cameraCallBtn=$("cameraCallBtn"),speakerCallBtn=$("speakerCallBtn"),flipCameraBtn=$("flipCameraBtn"),endCallBtn=$("endCallBtn"),incomingCallRinging=$("incomingCallRinging");
+
+let isRegister=false,currentUser=null,selectedUser=null,selectedChat=null,unsubscribeMessages=null,unsubscribeChat=null,unsubscribeTyping=null;
+let allUsers=[],loadedMessages=[],replyingTo=null,typingTimer=null,mediaRecorder=null,voiceChunks=[],isRecording=false;
+let myProfileData={},myFriends=new Set(),incomingFriendRequests=[],outgoingFriendRequests=[];
+let unsubscribeMyProfile=null,unsubscribeIncomingFriendRequests=null,unsubscribeOutgoingFriendRequests=null,unsubscribeUsers=null;
+let messaging=null,notificationToken=null;
+
+// WebRTC call state
+let peerConnection=null,localStream=null,currentCallId=null,currentCallType=null,currentCallRole=null;
+let unsubscribeIncomingCalls=null,unsubscribeCallDoc=null,unsubscribeCallerCandidates=null,unsubscribeCalleeCandidates=null;
+let incomingCallData=null;
+let callStartedAt=0,callTimer=null,callTimeoutTimer=null,lastHandledIceRestartAt=0;
+let cameraFacingMode="user";
+let qrScanner=null,qrScannerRunning=false,deferredInstallPrompt=null;
+
+// ===== CALL RINGTONE =====
+let ringtoneCtx=null,ringtoneTimer=null,ringtoneGain=null;
+
+function stopRingtone(){
+  try{
+    if(ringtoneTimer){clearInterval(ringtoneTimer);ringtoneTimer=null;}
+    if(ringtoneGain){
+      const now=ringtoneGain.context.currentTime;
+      ringtoneGain.gain.cancelScheduledValues(now);
+      ringtoneGain.gain.setTargetAtTime(0.0001,now,0.03);
+    }
+  }catch(_){}
+}
+
+async function startRingtone(){
+  try{
+    stopRingtone();
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC)return;
+
+    if(!ringtoneCtx)ringtoneCtx=new AC();
+    if(ringtoneCtx.state==="suspended")await ringtoneCtx.resume();
+
+    ringtoneGain=ringtoneCtx.createGain();
+    ringtoneGain.gain.value=1.0;
+    ringtoneGain.connect(ringtoneCtx.destination);
+
+    const beep=()=>{
+      if(!ringtoneCtx||ringtoneCtx.state!=="running")return;
+      const now=ringtoneCtx.currentTime;
+
+      [880,660].forEach(freq=>{
+        const osc=ringtoneCtx.createOscillator();
+        const gain=ringtoneCtx.createGain();
+        osc.type="sine";
+        osc.frequency.setValueAtTime(freq,now);
+        gain.gain.setValueAtTime(0.0001,now);
+        gain.gain.exponentialRampToValueAtTime(0.22,now+0.025);
+        gain.gain.exponentialRampToValueAtTime(0.0001,now+0.40);
+        osc.connect(gain);
+        gain.connect(ringtoneGain);
+        osc.start(now);
+        osc.stop(now+0.43);
+      });
+    };
+
+    beep();
+    ringtoneTimer=setInterval(beep,900);
+  }catch(e){
+    console.warn("Ringtone could not start:",e);
+  }
+}
+
+async function unlockRingtoneAudio(){
+  try{
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC)return;
+    if(!ringtoneCtx)ringtoneCtx=new AC();
+    if(ringtoneCtx.state==="suspended")await ringtoneCtx.resume();
+  }catch(_){}
+}
+
+["pointerdown","touchstart","click","keydown"].forEach(evt=>{
+  document.addEventListener(evt,unlockRingtoneAudio,{passive:true});
+});
+
+
+
+function normalizeUsername(value){
+  return (value||"").trim().toLowerCase().replace(/^@+/,"");
+}
+function validateUsername(username){
+  if(!username) throw new Error("Enter a username.");
+  if(username.length<3 || username.length>20) throw new Error("Username must be 3-20 characters.");
+  if(!/^[a-z0-9._]+$/.test(username)) throw new Error("Username can use only letters, numbers, dot and underscore.");
+}
+function displayUsername(user){
+  return user?.username ? "@"+user.username : "";
+}
+function userSearchText(user){
+  return [
+    user?.name,
+    user?.username,
+    user?.email,
+    user?.isGroup ? user?.description : ""
+  ].filter(Boolean).join(" ").toLowerCase();
+}
+
+async function handleGroupInvite(){
+  try{
+    const groupId=new URLSearchParams(location.search).get("group"); if(!groupId||!currentUser)return;
+    const data=await getGroupData(groupId); if(!data||data.type!=="group")return toastMsg("Invalid or expired group invite.");
+    const participants=new Set(data.participants||[]);
+    if(participants.has(currentUser.uid)){toastMsg("You are already a member of this group."); history.replaceState({},document.title,location.pathname); return;}
+    if(!confirm(`Join "${data.name||"this group"}" on ShaanChat?`))return;
+    participants.add(currentUser.uid); const update={participants:[...participants],updatedAt:serverTimestamp()};
+    await updateDoc(doc(db,"chats",groupId),update); await syncGroupIndex(groupId,{...data,...update,updatedAt:undefined});
+    toastMsg(`Joined ${data.name||"the group"}`); await loadGroupIndex(); history.replaceState({},document.title,location.pathname);
+  }catch(e){console.error("Group invite:",e);toastMsg("Unable to join group: "+(e?.message||"Unknown error"));}
+}
+
+
+
+function cleanupRealtimeListeners(){
+  [unsubscribeUsers,unsubscribeMyProfile,unsubscribeIncomingFriendRequests,unsubscribeOutgoingFriendRequests,
+   unsubscribeMessages,unsubscribeChat,unsubscribeTyping,unsubscribeIncomingCalls,unsubscribeCallDoc,
+   unsubscribeCallerCandidates,unsubscribeCalleeCandidates].forEach(fn=>{try{fn?.()}catch(_){}});
+  unsubscribeUsers=unsubscribeMyProfile=unsubscribeIncomingFriendRequests=unsubscribeOutgoingFriendRequests=null;
+  unsubscribeMessages=unsubscribeChat=unsubscribeTyping=unsubscribeIncomingCalls=unsubscribeCallDoc=null;
+  unsubscribeCallerCandidates=unsubscribeCalleeCandidates=null;
+}
+async function ensureUserProfile(){
+  const r=doc(db,"users",currentUser.uid),s=await getDoc(r);
+  if(!s.exists()){
+    const base=normalizeUsername((currentUser.email||"user").split("@")[0]).replace(/[^a-z0-9._]/g,"").slice(0,16)||"user";
+    let username=base;
+    let n=1;
+    while(true){
+      const q=await getDocs(query(collection(db,"users"),where("usernameLower","==",username)));
+      if(q.empty)break;
+      username=(base.slice(0,14)+n).slice(0,20); n++;
+    }
+    await setDoc(r,{
+      uid:currentUser.uid,
+      name:currentUser.email?.split("@")[0]||"User",
+      username,
+      usernameLower:username,
+      email:currentUser.email||"",
+      online:true,lastSeen:serverTimestamp(),createdAt:serverTimestamp()
+    });
+  }else{
+    const d=s.data();
+    if(!d.username){
+      const base=normalizeUsername(d.name||currentUser.email?.split("@")[0]||"user").replace(/[^a-z0-9._]/g,"").slice(0,16)||"user";
+      let username=base, n=1;
+      while(true){
+        const q=await getDocs(query(collection(db,"users"),where("usernameLower","==",username)));
+        if(q.empty || (q.size===1 && q.docs[0].id===currentUser.uid))break;
+        username=(base.slice(0,14)+n).slice(0,20); n++;
+      }
+      await updateDoc(r,{username,usernameLower:username});
+    }
+  }
+}
+async function loadMyProfile(){
+  if(!currentUser)return;
+  if(unsubscribeMyProfile)unsubscribeMyProfile();
+  unsubscribeMyProfile=onSnapshot(doc(db,"users",currentUser.uid),snap=>{
+    if(!snap.exists())return;
+    const d=snap.data()||{};
+    myProfileData=d;
+    myFriends=new Set(Array.isArray(d.friends)?d.friends:[]);
+    myName.textContent=d.name||"User";
+    myUsername.textContent=displayUsername(d);
+    renderAvatar(myAvatar,d.photoURL,d.name);
+    renderUsers(allUsers);
+  },err=>console.warn("My profile listener:",err.message));
+}
+
+function friendRequestId(fromId,toId){return `${fromId}_${toId}`;}
+function isFriend(uid){return uid===currentUser?.uid || myFriends.has(uid);}
+function getIncomingRequest(uid){return incomingFriendRequests.find(r=>r.fromId===uid&&r.status==="pending");}
+function getOutgoingRequest(uid){return outgoingFriendRequests.find(r=>r.toId===uid&&r.status==="pending");}
+
+function listenFriendRequests(){
+  if(!currentUser)return;
+  if(unsubscribeIncomingFriendRequests)unsubscribeIncomingFriendRequests();
+  if(unsubscribeOutgoingFriendRequests)unsubscribeOutgoingFriendRequests();
+
+  const incomingQ=query(collection(db,"friendRequests"),where("toId","==",currentUser.uid));
+  unsubscribeIncomingFriendRequests=onSnapshot(incomingQ,async snap=>{
+    const rows=[];
+    for(const x of snap.docs){
+      const d={id:x.id,...x.data()};
+      try{const u=await getDoc(doc(db,"users",d.fromId));rows.push({...d,user:u.exists()?{id:u.id,...u.data()}:null});}
+      catch(_){rows.push(d)}
+    }
+    incomingFriendRequests=rows.filter(r=>r.status==="pending");
+    renderUsers(allUsers);
+  },err=>console.warn("Incoming friend requests:",err.message));
+
+  const outgoingQ=query(collection(db,"friendRequests"),where("fromId","==",currentUser.uid));
+  unsubscribeOutgoingFriendRequests=onSnapshot(outgoingQ,snap=>{
+    outgoingFriendRequests=snap.docs.map(x=>({id:x.id,...x.data()})).filter(r=>r.status==="pending");
+    renderUsers(allUsers);
+  },err=>console.warn("Outgoing friend requests:",err.message));
+}
+
+async function sendFriendRequest(user){
+  if(!currentUser||!user?.id||user.isGroup||user.id===currentUser.uid)return;
+  if(isFriend(user.id))return toastMsg("You are already friends.");
+  if(getIncomingRequest(user.id))return toastMsg("This user has already sent you a friend request. Accept it below.");
+  if(getOutgoingRequest(user.id))return toastMsg("Friend request already sent.");
+  try{
+    const id=friendRequestId(currentUser.uid,user.id);
+    await setDoc(doc(db,"friendRequests",id),{
+      fromId:currentUser.uid,toId:user.id,status:"pending",
+      fromName:myProfileData.name||myName.textContent||"User",
+      fromUsername:myProfileData.username||"",
+      createdAt:serverTimestamp(),updatedAt:serverTimestamp()
+    });
+    toastMsg("Friend request sent");
+  }catch(e){
+    console.error("Friend request:",e);
+    toastMsg("Friend request failed. Please publish firestore.rules first. "+(e?.message||"Permission denied"));
+  }
+}
+
+async function acceptFriendRequest(req){
+  if(!req?.fromId||!currentUser)return;
+  try{
+    const requestRef=doc(db,"friendRequests",req.id);
+    await updateDoc(requestRef,{status:"accepted",updatedAt:serverTimestamp(),acceptedAt:serverTimestamp()});
+    await updateDoc(doc(db,"users",currentUser.uid),{friends:arrayUnion(req.fromId),updatedAt:serverTimestamp()});
+    await updateDoc(doc(db,"users",req.fromId),{friends:arrayUnion(currentUser.uid),updatedAt:serverTimestamp()});
+    toastMsg("Friend request accepted");
+  }catch(e){
+    console.error("Accept friend request:",e);
+    toastMsg("Could not accept request: "+(e?.message||"Permission denied"));
+  }
+}
+
+async function declineFriendRequest(req){
+  if(!req?.id)return;
+  try{
+    await updateDoc(doc(db,"friendRequests",req.id),{status:"declined",updatedAt:serverTimestamp()});
+    toastMsg("Friend request declined");
+  }catch(e){
+    console.error("Decline friend request:",e);
+    toastMsg("Could not decline request: "+(e?.message||"Permission denied"));
+  }
+}
+
+async function cancelFriendRequest(user){
+  const req=getOutgoingRequest(user.id);
+  if(!req)return;
+  try{await updateDoc(doc(db,"friendRequests",req.id),{status:"cancelled",updatedAt:serverTimestamp()});toastMsg("Friend request cancelled");}
+  catch(e){toastMsg("Could not cancel request: "+(e?.message||"Permission denied"));}
+}
+
+async function setPresence(online){
+  if(!currentUser)return;
+  try{await updateDoc(doc(db,"users",currentUser.uid),{online,lastSeen:serverTimestamp()});}catch(e){console.warn(e)}
+  myPresence.textContent=online?"● Online":"● Offline";
+}
+setInterval(()=>{if(currentUser&&!document.hidden)setPresence(true)},30000);
+document.addEventListener("visibilitychange",async()=>{if(currentUser)setPresence(!document.hidden);if(currentUser&&!document.hidden){appLockChecked=false;await showAppLockIfEnabled()}});
+window.addEventListener("beforeunload",()=>{if(currentUser)navigator.sendBeacon&&navigator.sendBeacon(location.href,"")});
+
+function listenUsers(){
+  if(unsubscribeUsers)unsubscribeUsers();
+  const q=query(collection(db,"users"));
+  unsubscribeUsers=onSnapshot(q,snap=>{
+    const people=[];
+    snap.forEach(x=>{
+      if(x.id!==currentUser.uid)people.push({id:x.id,...x.data()});
+    });
+
+    // Preserve the current group cache while the people snapshot updates.
+    const groups=allUsers.filter(x=>x.isGroup);
+    allUsers=[...people,...groups];
+    renderUsers(allUsers);
+  },err=>{
+    console.warn("Users listener:",err.message);
+  });
+}
+let peopleHidden = localStorage.getItem("shaanHidePeople") === "1";
+
+function updatePeopleVisibilityUI(){
+  const title = $("peopleVisibilityTitle");
+  const desc = $("peopleVisibilityDesc");
+  const icon = $("peopleVisibilityIcon");
+  if(title) title.textContent = peopleHidden ? "Show People" : "Hide People";
+  if(desc) desc.textContent = peopleHidden
+    ? "Show the People list in the sidebar"
+    : "Hide the People list from the sidebar";
+  if(icon) icon.textContent = peopleHidden ? "👁️‍🗨️" : "👁️";
+}
+
+function setPeopleHidden(hidden){
+  peopleHidden = !!hidden;
+  localStorage.setItem("shaanHidePeople", peopleHidden ? "1" : "0");
+  updatePeopleVisibilityUI();
+  renderUsers(allUsers.filter(u => !u.isGroup || !peopleHidden));
+  toastMsg(peopleHidden ? "People list hidden" : "People list visible");
+}
+
+function renderUsers(users){
+  safeSetHTML(usersList, "");
+  const groups=users.filter(u=>u.isGroup);
+  const term=searchUsers.value.toLowerCase().trim().replace(/^@+/,"");
+  const people=users.filter(u=>!u.isGroup && term && userSearchText(u).includes(term));
+  const friends=users.filter(u=>!u.isGroup && isFriend(u.id));
+  const sentRequests=outgoingFriendRequests.map(r=>{
+    const u=allUsers.find(x=>!x.isGroup && x.id===r.toId);
+    return {...r,user:u||null};
+  });
+
+  // FRIENDS: accepted users are always visible here, without needing search.
+  if(friends.length){
+    const l=document.createElement("div");
+    l.className="section-label";
+    safeSetHTML(l, `Friends <span class="friend-list-badge">${friends.length}</span>`);
+    usersList.appendChild(l);
+    friends.forEach(u=>renderFriendListUser(u));
+  }
+
+  // INCOMING requests: people who sent you a request.
+  if(incomingFriendRequests.length){
+    const l=document.createElement("div");
+    l.className="section-label";
+    safeSetHTML(l, `Friend Requests <span class="friend-list-badge">${incomingFriendRequests.length}</span>`);
+    usersList.appendChild(l);
+    incomingFriendRequests.forEach(req=>renderFriendRequest(req));
+  }
+
+  // OUTGOING requests: requests YOU have sent and are still pending.
+  if(sentRequests.length){
+    const l=document.createElement("div");
+    l.className="section-label";
+    safeSetHTML(l, `Requests Sent <span class="friend-list-badge">${sentRequests.length}</span>`);
+    usersList.appendChild(l);
+    sentRequests.forEach(req=>renderOutgoingRequest(req));
+  }
+
+  if(groups.length){
+    const l=document.createElement("div");
+    l.className="section-label";
+    l.textContent="Groups";
+    usersList.appendChild(l);
+    groups.forEach(renderUser);
+  }
+
+  if(!peopleHidden){
+    const l=document.createElement("div");
+    l.className="section-label";
+    l.textContent="People";
+    usersList.appendChild(l);
+
+    if(!term){
+      const e=document.createElement("div");
+      e.className="people-hint";
+      safeSetHTML(e, "Search by <b>profile name</b> or <b>@username</b> to find people.<br>Friends are shown above. Pending requests are shown separately.");
+      usersList.appendChild(e);
+    }else if(!people.length){
+      const e=document.createElement("div");
+      e.style.cssText="padding:25px;color:#7d8799;text-align:center";
+      e.textContent="No people found for this search.";
+      usersList.appendChild(e);
+    }else{
+      people.forEach(renderUser);
+    }
+  }
+}
+
+function renderFriendListUser(user){
+  const div=document.createElement("div");
+  div.className="user";
+  const online=!!user.online;
+  safeSetHTML(div, `<div class="user-avatar"></div><div class="user-info">
+    <div class="user-name">${esc(user.name||"User")}</div>
+    <div style="color:#00eaff);font-size:11px;margin-top:2px">${esc(displayUsername(user))}</div>
+    <div class="user-email"><span class="presence-dot ${online?"online":""}"></span>${online?"Online":"Offline"}</div>
+  </div>`;
+  renderAvatar(div.querySelector(".user-avatar"),user.photoURL,user.name);
+  const actions=document.createElement("div");
+  actions.className="friend-actions";
+  const msg=document.createElement("button");
+  msg.className="friend-btn primary";
+  msg.textContent="Message";
+  msg.onclick=e=>{e.stopPropagation();openChat(user,div)};
+  actions.appendChild(msg);
+  div.appendChild(actions);
+  div.onclick=()=>openChat(user,div);
+  usersList.appendChild(div);
+}
+
+function renderFriendRequest(req){
+  const user=req.user||{name:req.fromName||"User",username:req.fromUsername||""};
+  const div=document.createElement("div");
+  div.className="user friend-request-row";
+  safeSetHTML(div, `<div class="user-avatar"></div><div class="user-info">
+    <div class="user-name">${esc(user.name||"User")}</div>
+    <div style="color:#00eaff);font-size:11px;margin-top:2px">${esc(displayUsername(user))}</div>
+    <div class="friend-status incoming">Wants to be your friend</div>
+  </div>`;
+  renderAvatar(div.querySelector(".user-avatar"),user.photoURL,user.name);
+  const actions=document.createElement("div");
+  actions.className="friend-request-actions";
+  const accept=document.createElement("button");
+  accept.className="friend-btn accept";
+  accept.textContent="Accept";
+  accept.onclick=e=>{e.stopPropagation();acceptFriendRequest(req)};
+  const decline=document.createElement("button");
+  decline.className="friend-btn danger";
+  decline.textContent="Decline";
+  decline.onclick=e=>{e.stopPropagation();declineFriendRequest(req)};
+  actions.append(accept,decline);
+  div.appendChild(actions);
+  usersList.appendChild(div);
+}
+
+function renderOutgoingRequest(req){
+  const user=req.user||{name:req.toName||"User",username:req.toUsername||""};
+  const div=document.createElement("div");
+  div.className="user friend-request-row";
+  safeSetHTML(div, `<div class="user-avatar"></div><div class="user-info">
+    <div class="user-name">${esc(user.name||"User")}</div>
+    <div style="color:#00eaff);font-size:11px;margin-top:2px">${esc(displayUsername(user))}</div>
+    <div class="friend-status outgoing">Request pending · waiting for acceptance</div>
+  </div>`;
+  renderAvatar(div.querySelector(".user-avatar"),user.photoURL,user.name);
+  const actions=document.createElement("div");
+  actions.className="friend-request-actions";
+  const cancel=document.createElement("button");
+  cancel.className="cancel";
+  cancel.textContent="Cancel";
+  cancel.onclick=e=>{e.stopPropagation();if(req.user)cancelFriendRequest(req.user);else cancelFriendRequest({id:req.toId})};
+  actions.appendChild(cancel);
+  div.appendChild(actions);
+  if(user.id) div.onclick=()=>toastMsg("Friend request is still pending.");
+  usersList.appendChild(div);
+}
+
+function renderUser(user){
+  const div=document.createElement("div");
+  div.className="user";
+  if(user.isGroup)div.dataset.groupId=user.id;
+  const online=user.isGroup?true:!!user.online;
+  const friend=isFriend(user.id);
+  const incoming=getIncomingRequest(user.id);
+  const outgoing=getOutgoingRequest(user.id);
+
+  safeSetHTML(div, `<div class="user-avatar"></div><div class="user-info">
+    <div class="user-name">${esc(user.name||"User")}</div>
+    ${user.isGroup?"":`<div style="color:#00eaff);font-size:11px;margin-top:2px">${esc(displayUsername(user))}</div>`}
+    <div class="user-email"><span class="presence-dot ${online?"online":""}"></span>${user.isGroup?"Group":(friend?(online?"Online":"Offline"):(incoming?"Incoming request":(outgoing?"Request sent":"Not connected")))}</div>
+  </div>`;
+  renderAvatar(div.querySelector(".user-avatar"),user.photoURL,user.name);
+
+  if(user.isGroup){
+    const actions=document.createElement("div");actions.className="group-actions";
+    const archive=document.createElement("button");archive.type="button";archive.title="Archive group";archive.textContent="📦";
+    archive.onclick=(ev)=>{ev.stopPropagation();archiveGroup(user)};actions.appendChild(archive);
+    if(user.createdBy===currentUser.uid){
+      const del=document.createElement("button");del.type="button";del.title="Delete group";del.textContent="🗑️";
+      del.onclick=(ev)=>{ev.stopPropagation();deleteGroup(user)};actions.appendChild(del);
+    }
+    div.appendChild(actions);
+    div.onclick=()=>openChat(user,div);
+    usersList.appendChild(div);
+    return;
+  }
+
+  const actions=document.createElement("div");actions.className="friend-actions";
+  const btn=document.createElement("button");btn.className="friend-btn";
+  if(friend){
+    btn.classList.add("primary");btn.textContent="Message";
+    btn.onclick=e=>{e.stopPropagation();openChat(user,div)};
+  }else if(incoming){
+    btn.classList.add("accept");btn.textContent="Accept";
+    btn.onclick=e=>{e.stopPropagation();acceptFriendRequest(incoming)};
+  }else if(outgoing){
+    btn.textContent="Sent";btn.onclick=e=>{e.stopPropagation();cancelFriendRequest(user)};
+  }else{
+    btn.classList.add("primary");btn.textContent="Add Friend";
+    btn.onclick=e=>{e.stopPropagation();sendFriendRequest(user)};
+  }
+  actions.appendChild(btn);div.appendChild(actions);
+  div.onclick=()=>{
+    if(friend)openChat(user,div);
+    else if(incoming)acceptFriendRequest(incoming);
+    else toastMsg(outgoing?"Friend request already sent.":"Send a friend request first.");
+  };
+  usersList.appendChild(div);
+}
+
+function lastSeen(ts){if(!ts?.toDate)return"Offline";return"Last seen "+formatTime(ts.toDate())}
+function renderAvatar(el,url,name){
+  if(!el)return;
+
+  const safeName=name||"User";
+  el.classList.add("profile-avatar-click");
+  el.dataset.photoUrl=url||"";
+  el.dataset.photoName=safeName;
+
+  // Remove the old handler/content before rendering the new avatar.
+  el.onclick=null;
+  safeSetHTML(el, "");
+
+  if(url){
+    const img=document.createElement("img");
+    img.src=url;
+    img.alt=safeName+" profile photo";
+    img.loading="lazy";
+    img.decoding="async";
+    img.draggable=false;
+
+    img.onerror=()=>{
+      console.warn("Profile image failed to load:",url);
+      safeSetHTML(el, "");
+      el.textContent=getInitials(safeName);
+      el.onclick=null;
+    };
+
+    el.appendChild(img);
+    el.onclick=(ev)=>{
+      ev.preventDefault();
+      ev.stopPropagation();
+      openProfileImage(url,safeName);
+    };
+  }else{
+    el.textContent=getInitials(safeName);
+  }
+}
+
+function openProfileImage(url,name){
+  if(!url)return toastMsg("This user has no profile photo.");
+
+  const safeName=name||"User";
+
+  // Prepare the viewer before making it visible.
+  profileImageLarge.onload=null;
+  profileImageLarge.onerror=()=>{
+    console.error("Unable to display profile image.");
+    closeProfileImageViewer();
+    toastMsg("Profile image could not be displayed.");
+  };
+
+  profileImageLarge.alt=safeName+" profile photo";
+  profileImageName.textContent=safeName;
+  profileImageLarge.src=url;
+
+  profileImageModal.classList.remove("hidden");
+  document.body.style.overflow="hidden";
+}
+
+function closeProfileImageViewer(){
+  profileImageModal.classList.add("hidden");
+  profileImageLarge.removeAttribute("src");
+  profileImageLarge.removeAttribute("alt");
+  profileImageLarge.onerror=null;
+  document.body.style.overflow="";
+}
+
+closeProfileImage.onclick=(e)=>{
+  e.preventDefault();
+  e.stopPropagation();
+  closeProfileImageViewer();
+};
+
+// Only clicking the dark background closes the viewer.
+// Clicking the actual photo no longer closes it.
+profileImageModal.onclick=e=>{
+  if(e.target===profileImageModal)closeProfileImageViewer();
+};
+
+profileImageLarge.onclick=e=>{
+  e.preventDefault();
+  e.stopPropagation();
+};
+
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"&&!profileImageModal.classList.contains("hidden")){
+    closeProfileImageViewer();
+  }
+});
+function getInitials(n){return(n||"U").split(/\s+/).map(x=>x[0]).join("").slice(0,2).toUpperCase()}
+function esc(v){const d=document.createElement("div");d.textContent=v??"";return d.innerHTML}
+function escAttr(v){return esc(v).replace(/"/g,"&quot;")}
+
+
+function isGroupAdmin(groupData,uid=currentUser?.uid){
+  if(!groupData||!uid)return false;
+  return groupData.createdBy===uid || (groupData.admins||[]).includes(uid);
+}
+function isGroupCreator(groupData,uid=currentUser?.uid){
+  return !!groupData && groupData.createdBy===uid;
+}
+function groupPermission(groupData,key){
+  if(!groupData)return false;
+  if(isGroupCreator(groupData))return true;
+  if(!isGroupAdmin(groupData))return false;
+  const p=groupData.permissions||{};
+  if(key==="addMembers")return p.addMembers!==false;
+  if(key==="removeMembers")return p.removeMembers!==false;
+  if(key==="editInfo")return p.editInfo!==false;
+  return false;
+}
+async function getGroupData(groupId){
+  const s=await getDoc(doc(db,"chats",groupId));
+  return s.exists()?{id:groupId,...s.data()}:null;
+}
+async function syncGroupIndex(groupId,data){
+  try{
+    await setDoc(doc(db,"groupIndex",groupId),{
+      chatId:groupId,
+      name:data.name||"Group",
+      description:data.description||"",
+      photoURL:data.photoURL||null,
+      participants:data.participants||[],
+      createdBy:data.createdBy,
+      admins:data.admins||[],
+      archivedBy:data.archivedBy||{},
+      permissions:data.permissions||{},
+      updatedAt:serverTimestamp()
+    },{merge:true});
+  }catch(e){console.warn("Group index sync:",e.message)}
+}
+async function openGroupSettings(group){
+  if(!group?.isGroup)return;
+  try{
+    const data=await getGroupData(group.id);
+    if(!data)return toastMsg("Group not found.");
+    groupSettingsName.value=data.name||group.name||"";
+    groupDescription.value=data.description||"";
+    permAddMembers.checked=!!data.permissions?.addMembers;
+    permRemoveMembers.checked=data.permissions?.removeMembers!==false;
+    permEditInfo.checked=data.permissions?.editInfo!==false;
+    renderGroupPhotoPreview(data);
+    renderGroupMembers(data);
+    const admin=isGroupAdmin(data);
+    const creator=isGroupCreator(data);
+    groupSettingsName.disabled=!groupPermission(data,"editInfo");
+    groupDescription.disabled=!groupPermission(data,"editInfo");
+    groupPhotoInput.disabled=!groupPermission(data,"editInfo");
+    permAddMembers.disabled=!creator;
+    permRemoveMembers.disabled=!creator;
+    permEditInfo.disabled=!creator;
+    saveGroupSettings.classList.toggle("hidden",!groupPermission(data,"editInfo")&&!creator);
+    groupSettingsModal.classList.remove("hidden");
+  }catch(e){
+    console.error("Group settings:",e);
+    toastMsg("Group settings failed: "+e.message);
+  }
+}
+function renderGroupPhotoPreview(data){
+  if(data?.photoURL){
+    safeSetHTML(groupPhotoPreview, `<img src="${escAttr(data.photoURL)}" alt="">`);
+  }else{
+    groupPhotoPreview.textContent=getInitials(data?.name||"Group");
+  }
+}
+async function renderGroupMembers(data){
+  safeSetHTML(groupMembersList, "");
+  const ids=[...new Set(data.participants||[])];
+  for(const uid of ids){
+    const snap=await getDoc(doc(db,"users",uid)); if(!snap.exists())continue;
+    const u=snap.data(), creator=uid===data.createdBy, admin=(data.admins||[]).includes(uid), me=uid===currentUser.uid;
+    const row=document.createElement("div"); row.className="group-member-row";
+    const role=creator?"👑 Admin":admin?"🛡️ Co-admin":"👤 Member";
+    safeSetHTML(row, `<div class="user-avatar" style="width:38px);height:38px"></div><div class="group-member-meta"><strong>${esc(u.name||"User")}${me?" (You)":""}</strong><div style="color:#00eaff;font-size:11px">${esc(displayUsername(u))}</div><div class="group-role">${role}</div></div><div class="group-member-actions"></div>`;
+    renderAvatar(row.querySelector(".user-avatar"),u.photoURL,u.name);
+    const actions=row.querySelector(".group-member-actions");
+    if(!me && !creator && isGroupAdmin(data)){
+      if(isGroupCreator(data)){
+        const roleBtn=document.createElement("button"); roleBtn.textContent=admin?"Remove admin":"Make co-admin"; roleBtn.onclick=()=>changeGroupAdmin(data,uid,!admin); actions.appendChild(roleBtn);
+        const transferBtn=document.createElement("button"); transferBtn.textContent="Transfer owner"; transferBtn.onclick=()=>transferGroupOwnership(data,uid,u.name||"this member"); actions.appendChild(transferBtn);
+      }
+      if(groupPermission(data,"removeMembers")){const removeBtn=document.createElement("button"); removeBtn.textContent="Remove"; removeBtn.onclick=()=>removeGroupMember(data,uid); actions.appendChild(removeBtn);}
+    }
+    groupMembersList.appendChild(row);
+  }
+  if(!ids.length)safeSetHTML(groupMembersList, '<div style="padding:15px);color:#8490a5">No members.</div>';
+}
+async function transferGroupOwnership(data,uid,name){
+  if(!isGroupCreator(data))return toastMsg("Only the group creator can transfer ownership.");
+  if(uid===currentUser.uid)return;
+  if(!confirm(`Transfer group ownership to ${name}? You will become a co-admin.`))return;
+  try{
+    const admins=new Set(data.admins||[]); admins.add(uid); admins.add(currentUser.uid);
+    const update={createdBy:uid,admins:[...admins],updatedAt:serverTimestamp()};
+    await updateDoc(doc(db,"chats",data.id),update); await syncGroupIndex(data.id,{...data,...update,updatedAt:undefined});
+    toastMsg("Group ownership transferred");
+    const fresh=await getGroupData(data.id); if(fresh)renderGroupMembers(fresh);
+    selectedUser={...selectedUser,createdBy:uid,admins:[...admins]}; loadGroupIndex();
+  }catch(e){console.error(e);toastMsg("Ownership transfer failed: "+(e?.message||"Unknown error"));}
+}
+async function changeGroupAdmin(data,uid,makeAdmin){
+  if(!isGroupCreator(data))return toastMsg("Only the group creator can manage co-admins.");
+  try{
+    const admins=new Set(data.admins||[]);
+    if(makeAdmin)admins.add(uid);else admins.delete(uid);
+    admins.add(data.createdBy);
+    const update={admins:[...admins],updatedAt:serverTimestamp()};
+    await updateDoc(doc(db,"chats",data.id),update);
+    await syncGroupIndex(data.id,{...data,...update,updatedAt:undefined});
+    toastMsg(makeAdmin?"Co-admin added":"Co-admin removed");
+    const fresh=await getGroupData(data.id);renderGroupMembers(fresh);
+  }catch(e){console.error(e);toastMsg("Admin update failed: "+e.message)}
+}
+async function removeGroupMember(data,uid){
+  if(!groupPermission(data,"removeMembers"))return toastMsg("You don't have permission to remove members.");
+  if(uid===data.createdBy)return toastMsg("The group creator cannot be removed.");
+  if(!confirm("Remove this member from the group?"))return;
+  try{
+    const participants=(data.participants||[]).filter(x=>x!==uid);
+    const admins=(data.admins||[]).filter(x=>x!==uid);
+    const update={participants,admins,updatedAt:serverTimestamp()};
+    await updateDoc(doc(db,"chats",data.id),update);
+    await syncGroupIndex(data.id,{...data,...update,updatedAt:undefined});
+    toastMsg("Member removed");
+    const fresh=await getGroupData(data.id);renderGroupMembers(fresh);
+    loadGroupIndex();
+  }catch(e){console.error(e);toastMsg("Remove failed: "+e.message)}
+}
+async function addGroupMembers(data){
+  if(!groupPermission(data,"addMembers"))return toastMsg("You don't have permission to add members.");
+  const existing=new Set(data.participants||[]);
+  const available=allUsers.filter(u=>!u.isGroup&&!existing.has(u.id));
+  if(!available.length)return toastMsg("No users available to add.");
+  const choices=available.map(u=>`${u.name||"User"} (@${u.username||""})`).join("\n");
+  const raw=prompt("Enter username(s) to add, separated by commas:\n\n"+choices);
+  if(!raw)return;
+  const names=raw.split(",").map(x=>normalizeUsername(x)).filter(Boolean);
+  const matches=available.filter(u=>names.includes(normalizeUsername(u.username)));
+  if(!matches.length)return toastMsg("No matching usernames found.");
+  const participants=[...existing,...matches.map(u=>u.id)];
+  try{
+    const update={participants,updatedAt:serverTimestamp()};
+    await updateDoc(doc(db,"chats",data.id),update);
+    await syncGroupIndex(data.id,{...data,...update,updatedAt:undefined});
+    toastMsg(`${matches.length} member${matches.length>1?"s":""} added`);
+    const fresh=await getGroupData(data.id);renderGroupMembers(fresh);
+    loadGroupIndex();
+  }catch(e){console.error(e);toastMsg("Add members failed: "+e.message)}
+}
+
+async function openChat(user,element){
+  if(!user?.isGroup && !isFriend(user.id)){
+    toastMsg("You can message this person only after they accept your friend request.");
+    return;
+  }
+  selectedUser=user;
+  selectedChat=null;
+
+  document.querySelectorAll(".user").forEach(x=>x.classList.remove("active"));
+  element.classList.add("active");
+
+  chatName.textContent=user.name||"User";
+  chatUsername.textContent=user.isGroup?"":displayUsername(user);
+  renderAvatar(chatAvatar,user.photoURL,user.name);
+  chatStatus.textContent=user.isGroup?"Group":(user.online?"● Online":lastSeen(user.lastSeen));
+  groupSettingsBtn.classList.toggle("hidden",!user.isGroup);
+  blockUserBtn.classList.add("hidden");
+  chatSecurityBtn.classList.toggle("hidden",!!user.isGroup);
+  voiceCallBtn.classList.toggle("hidden",!!user.isGroup);
+  videoCallBtn.classList.toggle("hidden",!!user.isGroup);
+  window.scRestoreChatHeaderControls?.();
+
+  if(unsubscribeMessages)unsubscribeMessages();
+  if(unsubscribeTyping)unsubscribeTyping();
+
+  const chatId=getChatId(user);
+  const participants=user.isGroup
+    ? [...new Set(user.participants || [])]
+    : [currentUser.uid,user.id].sort();
+
+  try{
+    // Create/update the chat without reading it first. This avoids the
+    // permission failure that occurs when a chat document does not exist.
+    const chatData={
+      chatId,
+      type:user.isGroup?"group":"direct",
+      name:user.isGroup?(user.name||"Group"):null,
+      participants,
+      createdBy:user.isGroup?(user.createdBy||currentUser.uid):currentUser.uid,
+      typing:{}
+    };
+
+    await setDoc(doc(db,"chats",chatId),chatData,{merge:true});
+    selectedChat={id:chatId,...chatData,...(user.isGroup?{groupId:chatId}:{}),};
+    messageInput.disabled=false;
+    sendBtn.disabled=false;
+    app.classList.add("chat-open");
+
+    listenMessages(chatId);
+    listenTyping(chatId);
+  }catch(e){
+    console.error("Open chat error:",e);
+    messageInput.disabled=true;
+    sendBtn.disabled=true;
+    toastMsg("Chat open failed: "+(e?.message||"Unknown Firebase error"));
+  }
+}
+blockUserBtn.onclick=blockSelectedUser;
+function getChatId(user=selectedUser){
+  if(user?.isGroup)return user.chatId||user.id;
+  return "dm_v2_"+[currentUser.uid,user.id].sort().join("_");
+}
+function listenMessages(chatId){
+  if(unsubscribeMessages)unsubscribeMessages();
+  const q=query(collection(db,"chats",chatId,"messages"),orderBy("createdAt","asc"));
+  unsubscribeMessages=onSnapshot(q,snap=>{
+    loadedMessages=[];safeSetHTML(messages, "");
+    let visibleCount=0;
+    snap.forEach(x=>{
+      const d={id:x.id,...x.data()};
+      loadedMessages.push(d);
+      if(d.deletedFor && d.deletedFor[currentUser.uid]===true) return;
+      visibleCount++;
+      renderMessage(d);
+    });
+    if(visibleCount===0){
+      safeSetHTML(messages, '<div class="empty">No messages yet. Say hello 👋</div>');
+    }
+    scrollMessages();
+    markMessagesDelivered(chatId);
+    markMessagesSeen(chatId);
+  },e=>{console.error(e);toastMsg("Chat read error: "+e.message)});
+}
+function mediaFallback(url,name){
+  const box=document.createElement("div");box.className="media-fallback";
+  safeSetHTML(box, `<span>⚠️ ${esc(name||"Media")}</span><a href="${escAttr(safeExternalUrl(url))}" target="_blank" rel="noopener">Open</a>`);
+  return box;
+}
+
+function mediaFileName(d, fallback="download"){
+  return String(d?.fileName || fallback).replace(/[\\/:*?"<>|]+/g,"_").trim() || fallback;
+}
+
+function addMediaActions(parent,d,{open=false}={}){
+  const row=document.createElement("div");
+  row.className="media-download-row";
+  if(open){
+    const openBtn=document.createElement("button");
+    openBtn.type="button";openBtn.className="media-open-btn";
+    openBtn.textContent="🔍 View full";
+    openBtn.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();openMediaViewer(d);});
+    row.appendChild(openBtn);
+  }
+  const dl=document.createElement("button");
+  dl.type="button";dl.className="media-download-btn";dl.textContent="⬇️ Download";
+  dl.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();downloadMediaFile(d.url,mediaFileName(d,"media"));});
+  row.appendChild(dl);
+  parent.appendChild(row);
+}
+
+function openMediaViewer(d){
+  if(!d?.url){toastMsg("Media URL not available.");return;}
+  const viewer=document.getElementById("mediaViewer");
+  const content=document.getElementById("mediaViewerContent");
+  const title=document.getElementById("mediaViewerTitle");
+  const download=document.getElementById("mediaViewerDownload");
+  const open=document.getElementById("mediaViewerOpen");
+  if(!viewer||!content||!title||!download||!open){toastMsg("Media viewer is unavailable. Refresh the page.");return;}
+
+  content.replaceChildren();
+  title.textContent=d.fileName||"Media";
+  open.href=d.url; open.target="_blank"; open.rel="noopener noreferrer";
+  download.onclick=e=>{e.preventDefault();e.stopPropagation();downloadMediaFile(d.url,mediaFileName(d,"media"));};
+
+  const type=d.type||"file";
+  if(type==="image"){
+    const img=document.createElement("img");
+    img.className="media-viewer-content";img.alt=d.fileName||"Image";
+    img.onload=()=>toastMsg("Image opened");
+    img.onerror=()=>{safeSetHTML(content, "<div class='media-fallback'>⚠️ Unable to load this image. <a href='"+escAttr(safeExternalUrl(d.url))+"' target='_blank' rel='noopener'>Open original</a></div>");};
+    img.src=d.url;content.appendChild(img);
+  }else if(type==="video"){
+    const video=document.createElement("video");
+    video.className="media-viewer-content media-viewer-video";
+    video.controls=true;video.playsInline=true;video.preload="metadata";video.muted=false;
+    const source=document.createElement("source");source.src=d.url;if(d.mimeType)source.type=d.mimeType;
+    video.appendChild(source);content.appendChild(video);
+    video.addEventListener("error",()=>toastMsg("Video could not be loaded"));
+  }else if(type==="audio"){
+    const audio=document.createElement("audio");
+    audio.className="media-viewer-audio";audio.controls=true;audio.preload="metadata";audio.autoplay=false;
+    audio.src=d.url;
+    content.appendChild(audio);
+    // Prefer original Cloudinary audio URL first; generated mp3 transforms can
+    // fail when the account does not allow that transformation.
+    audio.addEventListener("error",()=>{
+      if(d.playbackUrl && audio.src!==d.playbackUrl){audio.src=d.playbackUrl;audio.load();}
+      else toastMsg("Audio could not be loaded");
+    });
+  }else{
+    const isPdf=(d.mimeType||"").toLowerCase()==="application/pdf" || /\.pdf$/i.test(d.fileName||"");
+    if(isPdf){
+      const iframe=document.createElement("iframe");iframe.className="media-viewer-pdf";iframe.src=d.url+"#toolbar=1&navpanes=0";iframe.title=d.fileName||"PDF";content.appendChild(iframe);
+    }else{
+      const box=document.createElement("div");box.className="media-fallback";
+      safeSetHTML(box, `📄 <strong>${esc(d.fileName||"File")}</strong><br><a href="${escAttr(safeExternalUrl(d.url))}" target="_blank" rel="noopener">Open file</a>`);
+      content.appendChild(box);
+    }
+  }
+  viewer.classList.remove("hidden");
+  viewer.setAttribute("aria-hidden","false");
+  viewer.style.display="flex";
+  document.body.style.overflow="hidden";
+}
+
+function closeMediaViewer(){
+  const viewer=document.getElementById("mediaViewer");
+  const content=document.getElementById("mediaViewerContent");
+  if(content)content.replaceChildren();
+  if(viewer){viewer.classList.add("hidden");viewer.setAttribute("aria-hidden","true");viewer.style.display="none";}
+  document.body.style.overflow="";
+}
+
+document.getElementById("mediaViewerClose")?.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();closeMediaViewer();});
+document.getElementById("mediaViewer")?.addEventListener("click",e=>{if(e.target.id==="mediaViewer")closeMediaViewer();});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeMediaViewer();});
+
+function renderMessage(d){
+  const sent=d.senderId===currentUser.uid;
+  const wrap=document.createElement("div");wrap.className="message-wrap "+(sent?"sent":"received");wrap.dataset.id=d.id;
+  const actions=document.createElement("div");actions.className="message-actions";
+  const reply=document.createElement("button");
+  reply.textContent="↩";
+  reply.title="Reply";
+  reply.onclick=()=>startReply(d);
+  actions.appendChild(reply);
+
+  const delMe=document.createElement("button");
+  delMe.textContent="🗑 Me";
+  delMe.title="Delete for me";
+  delMe.onclick=()=>deleteForMe(d);
+  actions.appendChild(delMe);
+
+  if(sent){
+    const delEveryone=document.createElement("button");
+    delEveryone.textContent="🗑 All";
+    delEveryone.title="Delete for everyone";
+    delEveryone.onclick=()=>deleteForEveryone(d);
+    actions.appendChild(delEveryone);
+  }
+  const bubble=document.createElement("div");bubble.className="message";
+  if(d.replyTo)safeSetHTML(bubble, bubble.innerHTML + (`<div class="reply-preview">${esc(d.replyTo.senderName||"User")}: ${esc(d.replyTo.text||"Attachment")}</div>`));
+
+  if(d.type==="image"){
+    const img=document.createElement("img");
+    img.className="media media-clickable";img.src=d.url;img.alt=d.fileName||"image";img.loading="lazy";
+    img.title="Click to view full image";
+    img.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();openMediaViewer(d);});
+    img.onerror=()=>{img.replaceWith(mediaFallback(d.url,d.fileName||"Image"));};
+    bubble.appendChild(img);
+    addMediaActions(bubble,d,{open:true});
+  }else if(d.type==="video"){
+    const video=document.createElement("video");
+    video.className="chat-video";video.controls=true;video.playsInline=true;video.preload="metadata";
+    const source=document.createElement("source");source.src=d.url;if(d.mimeType)source.type=d.mimeType;video.appendChild(source);
+    video.onerror=()=>{video.replaceWith(mediaFallback(d.url,d.fileName||"Video"));};
+    bubble.appendChild(video);
+    addMediaActions(bubble,d,{open:true});
+  }else if(d.type==="audio"){
+    const audio=document.createElement("audio");
+    audio.className="chat-audio";audio.controls=true;audio.preload="metadata";audio.src=d.playbackUrl||d.url;
+    audio.onerror=()=>{
+      if(d.url && audio.src!==d.url){audio.src=d.url;audio.load();return;}
+      const fallback=mediaFallback(d.url,d.fileName||"Voice message");audio.replaceWith(fallback);
+    };
+    bubble.appendChild(audio);
+    const waveform=document.createElement("canvas");
+    waveform.className="audio-waveform";
+    waveform.width=520;waveform.height=72;waveform.setAttribute("aria-label","Audio waveform preview");
+    bubble.appendChild(waveform);
+    drawWaveformPreview(waveform,d.playbackUrl||d.url).catch(()=>{});
+    addMediaActions(bubble,d,{open:true});
+  }else if(d.type==="file"){
+    const fileCard=document.createElement("div");fileCard.className="file-card file-card-pdf";
+    const isPdf=(d.mimeType||"").toLowerCase()==="application/pdf" || /\.pdf$/i.test(d.fileName||"");
+    if(isPdf){
+      const pdf=document.createElement("iframe");pdf.className="chat-pdf";pdf.src=d.url+"#toolbar=1&navpanes=0";pdf.title=d.fileName||"PDF";pdf.loading="lazy";
+      fileCard.appendChild(pdf);
+      const bar=document.createElement("div");bar.className="file-card-bar";
+      safeSetHTML(bar, `📄 <strong>${esc(d.fileName||"PDF document")}</strong>`);
+      fileCard.appendChild(bar);
+      const actions=document.createElement("div");actions.className="media-download-row";
+      const view=document.createElement("button");view.type="button";view.className="media-open-btn";view.textContent="🔍 View full";
+      view.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();openMediaViewer(d);});
+      const open=document.createElement("a");open.className="media-open-btn";open.textContent="↗️ Open";open.href=d.url;open.target="_blank";open.rel="noopener";
+      const dl=document.createElement("button");dl.type="button";dl.className="media-download-btn";dl.textContent="⬇️ Download";
+      dl.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();downloadMediaFile(d.url,mediaFileName(d,"document.pdf"));});
+      actions.append(view,open,dl);fileCard.appendChild(actions);
+    }else{
+      const row=document.createElement("div");row.className="file-card";
+      safeSetHTML(row, `📄 <strong style="overflow:hidden);text-overflow:ellipsis">${esc(d.fileName||"File")}</strong>`;
+      fileCard.appendChild(row);
+      addMediaActions(fileCard,d,{open:true});
+    }
+    bubble.appendChild(fileCard);
+  }else safeSetHTML(bubble, bubble.innerHTML + (esc(d.text||"")));
+  const t=d.createdAt?.toDate?formatTime(d.createdAt.toDate()):"...";
+  const tick=sent?`<span class="ticks ${d.seen?"seen":""}">${d.seen||d.delivered?"✓✓":"✓"}</span>`:"";
+  safeSetHTML(bubble, bubble.innerHTML + (`<span class="message-time">${t}${tick}</span>`));
+  wrap.append(actions,bubble);messages.appendChild(wrap);
+}
+async function markMessagesDelivered(chatId){
+  for(const d of loadedMessages){
+    if(d.senderId!==currentUser.uid&&!d.delivered){
+      try{await updateDoc(doc(db,"chats",chatId,"messages",d.id),{delivered:true})}catch(e){}
+    }
+  }
+}
+async function markMessagesSeen(chatId){
+  if(!selectedUser)return;
+  for(const d of loadedMessages){
+    if(d.receiverId===currentUser.uid&&!d.seen){
+      try{await updateDoc(doc(db,"chats",chatId,"messages",d.id),{seen:true})}catch(e){}
+    }
+  }
+}
+async function deleteForMe(d){
+  if(!selectedChat||!currentUser)return;
+  if(!confirm("Delete this message only for you?"))return;
+  try{
+    const messageRef=doc(db,"chats",selectedChat.id,"messages",d.id);
+    await updateDoc(messageRef,{[`deletedFor.${currentUser.uid}`]:true});
+    toastMsg("Message deleted for you");
+  }catch(e){
+    console.error("Delete for me:",e);
+    toastMsg("Delete failed: "+e.message);
+  }
+}
+
+async function deleteForEveryone(d){
+  if(!selectedChat||!currentUser)return;
+  if(d.senderId!==currentUser.uid){
+    toastMsg("You can delete for everyone only your own message.");
+    return;
+  }
+  if(!confirm("Delete this message for everyone?"))return;
+  try{
+    const messageRef=doc(db,"chats",selectedChat.id,"messages",d.id);
+    await deleteDoc(messageRef);
+    toastMsg("Message deleted for everyone");
+  }catch(e){
+    console.error("Delete for everyone:",e);
+    toastMsg("Delete failed: "+e.message);
+  }
+}
+function startReply(d){replyingTo=d;replyText.textContent="Replying to: "+(d.text||d.fileName||"attachment");replyBar.classList.remove("hidden");messageInput.focus()}
+cancelReply.onclick=()=>{replyingTo=null;replyBar.classList.add("hidden")}
+
+
+/* ===== E2EE FOUNDATION =====
+   Message schema is intentionally unchanged by default. These helpers provide
+   AES-GCM key generation/encryption/decryption for a future authenticated
+   key-exchange layer; do not advertise messages as E2EE until keys are exchanged
+   and verified between both participants. */
+async function generateChatKey(){ return crypto.subtle.generateKey({name:"AES-GCM",length:256},true,["encrypt","decrypt"]); }
+async function exportChatKey(key){ return crypto.subtle.exportKey("jwk",key); }
+async function importChatKey(jwk){ return crypto.subtle.importKey("jwk",jwk,{name:"AES-GCM"},false,["encrypt","decrypt"]); }
+async function encryptMessageText(text,key){
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const encoded=new TextEncoder().encode(String(text||""));
+  const cipher=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,encoded);
+  return {ciphertext:b64url(new Uint8Array(cipher)),iv:b64url(iv),alg:"AES-GCM-256-v1"};
+}
+async function decryptMessageText(payload,key){
+  const iv=fromB64url(payload.iv),data=fromB64url(payload.ciphertext);
+  const plain=await crypto.subtle.decrypt({name:"AES-GCM",iv},key,data);
+  return new TextDecoder().decode(plain);
+}
+function b64url(bytes){let s="";bytes.forEach(b=>s+=String.fromCharCode(b));return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");}
+function fromB64url(str){const s=atob(String(str).replace(/-/g,"+").replace(/_/g,"/")+"===".slice((String(str).length+3)%4));return Uint8Array.from(s,c=>c.charCodeAt(0));}
+async function sendMessage(textOverride=null){
+  const text=(textOverride??messageInput.value).trim();
+  if(!text||!selectedUser||!currentUser)return;
+  if(!selectedUser.isGroup && !isFriend(selectedUser.id)){
+    toastMsg("Add this person as a friend before messaging.");
+    return;
+  }
+
+  const chatId=getChatId(selectedUser);
+  const participants=selectedUser.isGroup
+    ? [...new Set(selectedUser.participants || [])]
+    : [currentUser.uid,selectedUser.id].sort();
+
+  try{
+    // Ensure the chat exists without doing a permission-sensitive read first.
+    await setDoc(doc(db,"chats",chatId),{
+      chatId,
+      type:selectedUser.isGroup?"group":"direct",
+      name:selectedUser.isGroup?(selectedUser.name||"Group"):null,
+      participants,
+      createdBy:selectedUser.isGroup?(selectedUser.createdBy||currentUser.uid):currentUser.uid,
+      typing:{}
+    },{merge:true});
+
+    selectedChat={
+      id:chatId,
+      type:selectedUser.isGroup?"group":"direct",
+      name:selectedUser.isGroup?(selectedUser.name||"Group"):null,
+      participants
+    };
+
+    await addDoc(collection(db,"chats",chatId,"messages"),{
+      text,
+      senderId:currentUser.uid,
+      receiverId:selectedUser.isGroup?null:selectedUser.id,
+      senderName:myName.textContent,
+      type:"text",
+      delivered:false,
+      seen:false,
+      replyTo:replyingTo?{
+        id:replyingTo.id,
+        text:replyingTo.text||replyingTo.fileName||"Attachment",
+        senderName:replyingTo.senderName||"User"
+      }:null,
+      createdAt:serverTimestamp()
+    });
+
+    messageInput.value="";
+    cancelReply.click();
+    clearTyping();
+  }catch(e){
+    console.error("Message send error:",e);
+    toastMsg("Message failed: "+(e?.message||"Unknown Firebase error"));
+  }
+}
+sendBtn.onclick=()=>sendMessage();
+messageInput.onkeydown=e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMessage()}};
+messageInput.oninput=()=>setTyping(true);
+
+function listenTyping(chatId){
+  if(unsubscribeTyping)unsubscribeTyping();
+  unsubscribeTyping=onSnapshot(doc(db,"chats",chatId),s=>{
+    const t=s.data()?.typing||{};const names=Object.entries(t).filter(([id,v])=>id!==currentUser.uid&&v).map(([id])=>id);
+    typingIndicator.textContent=names.length?"typing…":"";
+  });
+}
+async function setTyping(on){
+  if(!selectedChat)return;
+  clearTimeout(typingTimer);
+  try{await updateDoc(doc(db,"chats",selectedChat.id),{["typing."+currentUser.uid]:on});}catch(e){}
+  if(on)typingTimer=setTimeout(clearTyping,2500);
+}
+async function clearTyping(){
+  clearTimeout(typingTimer);if(!selectedChat)return;
+  try{await updateDoc(doc(db,"chats",selectedChat.id),{["typing."+currentUser.uid]:deleteField()})}catch(e){}
+}
+
+attachBtn.onclick=()=>{if(!selectedChat)return toastMsg("Select a chat first");fileInput.click()};
+fileInput.onchange=async()=>{const files=[...fileInput.files];for(const f of files)await uploadAttachment(f);fileInput.value=""};
+async function uploadAttachment(file){
+  if(file.size>CLOUDINARY_MAX_FILE_SIZE)return toastMsg("Maximum file size is 20 MB.");
+  try{
+    toastMsg("Uploading "+file.name+"…");
+    const folder=`shaanchat/chat/${selectedChat.id}/${currentUser.uid}`;
+    const uploaded=await uploadMedia(file,folder);
+    const url=uploaded.secure_url;
+    const type=file.type.startsWith("image/")?"image":file.type.startsWith("video/")?"video":file.type.startsWith("audio/")?"audio":"file";
+    await addDoc(collection(db,"chats",selectedChat.id,"messages"),{
+      type,url,fileName:file.name,mimeType:file.type,size:file.size,senderId:currentUser.uid,
+      receiverId:selectedUser.isGroup?null:selectedUser.id,senderName:myName.textContent,seen:false,createdAt:serverTimestamp(),
+      storageProvider:"cloudinary",resourceType:uploaded.resource_type||null,publicId:uploaded.public_id||null
+    });toastMsg("Uploaded");
+  }catch(e){console.error("Cloudinary attachment upload:",e);toastMsg("Upload failed: "+(e?.message||"Cloudinary error"));}
+}
+
+recordBtn.onclick=async()=>{
+  if(!selectedChat)return toastMsg("Select a chat first");
+  if(isRecording){
+    try{mediaRecorder.stop();}catch(_){}
+    isRecording=false;recordBtn.classList.remove("recording");recordBtn.textContent="🎤";
+    return;
+  }
+  if(!navigator.mediaDevices?.getUserMedia)return toastMsg("Voice recording is not supported.");
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+    voiceChunks=[];
+    const mimeCandidates=["audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus"];
+    const mimeType=mimeCandidates.find(t=>MediaRecorder.isTypeSupported?.(t))||"";
+    mediaRecorder=mimeType?new MediaRecorder(stream,{mimeType}):new MediaRecorder(stream);
+    const recorderMime=mediaRecorder.mimeType||mimeType||"audio/webm";
+    isRecording=true;recordBtn.classList.add("recording");recordBtn.textContent="⏹";
+    mediaRecorder.ondataavailable=e=>{if(e.data&&e.data.size)voiceChunks.push(e.data)};
+    mediaRecorder.onerror=e=>{console.error("MediaRecorder error:",e);toastMsg("Voice recorder error.");};
+    mediaRecorder.onstop=async()=>{
+      stream.getTracks().forEach(t=>t.stop());
+      try{
+        const blob=new Blob(voiceChunks,{type:recorderMime});
+        if(!blob.size)return toastMsg("No voice audio was recorded.");
+        await uploadVoice(blob,recorderMime);
+      }catch(e){console.error(e);toastMsg("Voice upload failed: "+(e?.message||"Unknown error"));}
+    };
+    mediaRecorder.start(250);
+  }catch(e){console.error("Microphone:",e);toastMsg("Microphone permission denied or unavailable.");}
+};
+
+function cloudinaryAudioPlaybackUrl(url){
+  if(!url)return url;
+  try{
+    const u=new URL(url);
+    if(!u.hostname.includes("res.cloudinary.com")||!u.pathname.includes("/video/upload/"))return url;
+    const marker="/video/upload/";
+    const idx=u.pathname.indexOf(marker);
+    if(idx<0)return url;
+    const rest=u.pathname.slice(idx+marker.length);
+    if(rest.startsWith("f_mp3/"))return url;
+    const lastSlash=rest.lastIndexOf("/");
+    const dir=lastSlash>=0?rest.slice(0,lastSlash+1):"";
+    let file=lastSlash>=0?rest.slice(lastSlash+1):rest;
+    file=file.replace(/\.[^.\/]+$/,".mp3");
+    u.pathname=u.pathname.slice(0,idx+marker.length)+"f_mp3/"+dir+file;
+    return u.toString();
+  }catch(_){return url;}
+}
+
+async function uploadVoice(blob,mimeType){
+  try{
+    const ext=mimeType.includes("ogg")?"ogg":"webm";
+    const file=new File([blob],`voice-message-${Date.now()}.${ext}`,{type:mimeType||blob.type||"audio/webm"});
+    const uploaded=await uploadMedia(file,`shaanchat/voice/${selectedChat.id}/${currentUser.uid}`);
+    const url=uploaded.secure_url;
+    const playbackUrl=cloudinaryAudioPlaybackUrl(url);
+    await addDoc(collection(db,"chats",selectedChat.id,"messages"),{
+      type:"audio",url,playbackUrl,fileName:file.name,mimeType:mimeType||file.type,
+      resourceType:uploaded.resource_type||"video",publicId:uploaded.public_id||null,
+      senderId:currentUser.uid,receiverId:selectedUser.isGroup?null:selectedUser.id,
+      delivered:false,seen:false,createdAt:serverTimestamp(),storageProvider:"cloudinary"
+    });
+    toastMsg("Voice sent");
+  }catch(e){console.error("Cloudinary voice upload:",e);toastMsg("Voice upload failed: "+(e?.message||"Cloudinary error"));}
+}
+
+
+$("profilePhoto").onchange=async()=>{
+  const file=$("profilePhoto").files?.[0];
+  if(!file)return;
+
+  try{
+    if(!file.type.startsWith("image/"))throw new Error("Please select an image.");
+    const previewURL=URL.createObjectURL(file);
+
+    safeSetHTML(profilePhotoPreview, "");
+    const img=document.createElement("img");
+    img.src=previewURL;
+    img.alt="Selected profile photo";
+    img.onload=()=>URL.revokeObjectURL(previewURL);
+    img.onerror=()=>{
+      URL.revokeObjectURL(previewURL);
+      safeSetHTML(profilePhotoPreview, "");
+      profilePhotoPreview.textContent=getInitials($("profileName").value||"User");
+      toastMsg("Could not preview this image.");
+    };
+    profilePhotoPreview.appendChild(img);
+
+    profilePhotoPreview.onclick=(ev)=>{
+      ev.preventDefault();
+      ev.stopPropagation();
+      toastMsg("Preview shown. Tap Save to upload this photo.");
+    };
+  }catch(e){
+    toastMsg(e.message||"Image preview failed.");
+  }
+};
+
+const appLockScreen=$("appLockScreen"),appUnlockPin=$("appUnlockPin"),appUnlockError=$("appUnlockError");
+let appLockChecked=false;
+async function showAppLockIfEnabled(){if(!currentUser||appLockChecked)return;appLockChecked=true;try{const s=await getDoc(doc(db,"users",currentUser.uid));if(s.data()?.appPinHash){appLockScreen.classList.remove("hidden");appUnlockPin.value="";setTimeout(()=>appUnlockPin.focus(),80)}}catch(e){console.warn("App lock check:",e)}}
+async function unlockApp(){try{const s=await getDoc(doc(db,"users",currentUser.uid));const hash=s.data()?.appPinHash;if(!hash){appLockScreen.classList.add("hidden");return}if(await sha256(appUnlockPin.value)!==hash){appUnlockError.textContent="Incorrect PIN";appUnlockPin.value="";return}appUnlockError.textContent="";appLockScreen.classList.add("hidden");appUnlockPin.value=""}catch(e){appUnlockError.textContent="Unable to verify PIN"}}
+$("unlockAppBtn").onclick=unlockApp;appUnlockPin.onkeydown=e=>{if(e.key==="Enter")unlockApp()};
+const settingsModal=$("settingsModal");
+const privacySecurityBtn=$("privacySecurityBtn");
+async function loadPrivacySettings(){const s=await getDoc(doc(db,"users",currentUser.uid));const d=s.data()||{};lastSeenPrivacy.value=d.privacy?.lastSeen||"everyone";onlinePrivacy.value=d.privacy?.onlineStatus||"everyone";}
+async function savePrivacySettings(){try{await updateDoc(doc(db,"users",currentUser.uid),{privacy:{lastSeen:lastSeenPrivacy.value,onlineStatus:onlinePrivacy.value},updatedAt:serverTimestamp()});toastMsg("Privacy settings saved")}catch(e){toastMsg("Privacy save failed: "+e.message)}}
+async function toggleBlockUser(uid,block){await updateDoc(doc(db,"users",currentUser.uid),{blockedUsers:block?arrayUnion(uid):arrayRemove(uid),updatedAt:serverTimestamp()})}
+async function blockSelectedUser(){if(!selectedUser||selectedUser.isGroup)return toastMsg("Open a person chat first.");const me=await getDoc(doc(db,"users",currentUser.uid));const b=me.data()?.blockedUsers||[];const yes=b.includes(selectedUser.id);if(!yes&&!confirm(`Block ${selectedUser.name||"this user"}?`))return;try{await toggleBlockUser(selectedUser.id,!yes);toastMsg(yes?"User unblocked":"User blocked")}catch(e){toastMsg("Block update failed: "+e.message)}}
+async function openBlockedUsers(){const m=document.createElement("div");m.className="modal";const c=document.createElement("div");c.className="modal-card";safeSetHTML(c, '<div class="modal-title">🚫 Blocked Users</div><div class="privacy-user-list" id="blockedList"></div><div class="modal-actions"><button class="small-btn" id="closeBlocked">Close</button></div>');m.appendChild(c);document.body.appendChild(m);const list=c.querySelector("#blockedList");const me=await getDoc(doc(db,"users",currentUser.uid));const ids=me.data()?.blockedUsers||[];if(!ids.length)safeSetHTML(list, '<div style="padding:15px);color:#8490a5">No blocked users.</div>';for(const uid of ids){const us=await getDoc(doc(db,"users",uid));if(!us.exists())continue;const u=us.data();const row=document.createElement("div");row.className="privacy-user-row";safeSetHTML(row, '<div class="user-avatar"></div><div class="user-info"><strong>'+esc(u.name||"User")+'</strong><div style="color:#00eaff);font-size:11px">'+esc(displayUsername(u))+'</div></div><button class="privacy-mini-btn">Unblock</button>';renderAvatar(row.querySelector(".user-avatar"),u.photoURL,u.name);row.querySelector("button").onclick=async()=>{await toggleBlockUser(uid,false);row.remove();toastMsg("User unblocked")};list.appendChild(row)}c.querySelector("#closeBlocked").onclick=()=>m.remove();m.onclick=e=>{if(e.target===m)m.remove()}}
+async function reportSelectedUser(){if(!selectedUser||selectedUser.isGroup)return toastMsg("Open a person chat first.");const reason=prompt("Reason for reporting this user:","Spam");if(!reason)return;try{await addDoc(collection(db,"reports"),{reporterId:currentUser.uid,reportedUserId:selectedUser.id,reportedUserName:selectedUser.name||"User",reason:reason.slice(0,500),status:"open",createdAt:serverTimestamp()});toastMsg("Report submitted")}catch(e){toastMsg("Report failed: "+e.message)}}
+async function sha256(v){const h=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(v));return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,"0")).join("")}
+async function hasAppPin(){if(!currentUser)return false;try{const s=await getDoc(doc(db,"users",currentUser.uid));return !!s.data()?.appPinHash}catch(e){return false}}
+async function setAppPin(){const r=doc(db,"users",currentUser.uid);const s=await getDoc(r);const oldHash=s.data()?.appPinHash;if(oldHash){const old=prompt("Enter current PIN");if(old===null)return;if(await sha256(old)!==oldHash)return toastMsg("Incorrect PIN")}const pin=prompt("Enter new 4-6 digit PIN");if(pin===null)return;if(!/^\d{4,6}$/.test(pin))return toastMsg("PIN must be 4-6 digits");await updateDoc(r,{appPinHash:await sha256(pin),updatedAt:serverTimestamp()});toastMsg("App PIN enabled");updateAppLockStatus();appLockModal.classList.add("hidden")}
+async function removeAppPin(){const r=doc(db,"users",currentUser.uid);const s=await getDoc(r);if(!s.data()?.appPinHash)return toastMsg("App Lock is already OFF");const old=prompt("Enter current PIN to remove App Lock");if(old===null)return;if(await sha256(old)!==s.data().appPinHash)return toastMsg("Incorrect PIN");await updateDoc(r,{appPinHash:deleteField(),updatedAt:serverTimestamp()});toastMsg("App Lock removed");updateAppLockStatus();appLockModal.classList.add("hidden")}
+async function lockCurrentChat(){if(!selectedUser)return toastMsg("Open a chat first.");const id=getChatId(selectedUser);const a=JSON.parse(localStorage.getItem("shaanLockedChats")||"[]");const i=a.indexOf(id);if(i<0)a.push(id);else a.splice(i,1);localStorage.setItem("shaanLockedChats",JSON.stringify(a));toastMsg(i<0?"Chat locked":"Chat unlocked");updateChatSecurityLabels()}
+function isCurrentChatLocked(){if(!selectedUser)return false;const a=JSON.parse(localStorage.getItem("shaanLockedChats")||"[]");return a.includes(getChatId(selectedUser))}
+async function updateChatSecurityLabels(){if(!selectedUser||selectedUser.isGroup)return;const me=await getDoc(doc(db,"users",currentUser.uid));const blocked=(me.data()?.blockedUsers||[]).includes(selectedUser.id);chatBlockActionTitle.textContent=blocked?"Unblock User":"Block User";chatBlockActionSub.textContent=blocked?"Allow this user to contact you again":"Stop this user from contacting you";const locked=isCurrentChatLocked();chatLockActionTitle.textContent=locked?"Unlock Chat":"Chat Lock";chatLockActionSub.textContent=locked?"Remove the lock from this conversation":"Lock this conversation on this device"}
+async function openChatSecurity(){if(!selectedUser||selectedUser.isGroup)return toastMsg("Open a person chat first.");await updateChatSecurityLabels();chatSecurityModal.classList.remove("hidden")}
+async function accountSecurity(){securityEmail.textContent=currentUser?.email||"Not available";verifyEmailSub.textContent=currentUser?.emailVerified?"Your email is verified":"Email is not verified — tap to resend";accountSecurityModal.classList.remove("hidden")}
+async function sendResetEmailVisible(){if(!currentUser?.email)return toastMsg("No email is linked to this account.");try{const {sendPasswordResetEmail}=await import("https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js");await sendPasswordResetEmail(auth,currentUser.email);toastMsg("Password reset email sent to "+currentUser.email+". Check Spam/Promotions too.")}catch(e){console.error(e);toastMsg("Password reset failed: "+(e?.code||e?.message||"Unknown error"))}}
+async function resendVerification(){if(!currentUser)return;try{const {sendEmailVerification}=await import("https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js");if(currentUser.emailVerified){verifyEmailSub.textContent="Your email is verified";return toastMsg("Email is already verified")};await sendEmailVerification(currentUser);toastMsg("Verification email sent to "+currentUser.email+". Check Spam/Promotions.");verifyEmailSub.textContent="Verification email sent"}catch(e){toastMsg("Verification email failed: "+(e?.code||e?.message||"Unknown error"))}}
+async function updateAppLockStatus(){if(!currentUser)return;const on=await hasAppPin();appLockStatus.textContent=on?"ON":"OFF";appLockStatus.style.color=on?"#48e6a1":"#8490a5"}
+
+$("settingsBtn").onclick=()=>{
+  updatePeopleVisibilityUI();
+  settingsModal.classList.remove("hidden");
+};
+$("peopleVisibilityBtn").onclick=()=>{
+  setPeopleHidden(!peopleHidden);
+};
+privacySecurityBtn.onclick=async()=>{settingsModal.classList.add("hidden");await loadPrivacySettings();privacyModal.classList.remove("hidden")};
+$("closePrivacy").onclick=()=>privacyModal.classList.add("hidden");$("donePrivacy").onclick=()=>privacyModal.classList.add("hidden");$("savePrivacy").onclick=savePrivacySettings;$("blockedUsersBtn").onclick=openBlockedUsers;$("reportUserBtn").onclick=reportSelectedUser;$("chatLockBtn").onclick=lockCurrentChat;$("appPinBtn").onclick=async()=>{privacyModal.classList.add("hidden");await updateAppLockStatus();appLockModal.classList.remove("hidden")};$("accountSecurityBtn").onclick=async()=>{privacyModal.classList.add("hidden");await accountSecurity()};
+$("closeAppLock").onclick=()=>appLockModal.classList.add("hidden");$("setAppPinVisible").onclick=setAppPin;$("removeAppPinVisible").onclick=removeAppPin;
+$("closeAccountSecurity").onclick=()=>accountSecurityModal.classList.add("hidden");$("closeAccountSecurity2").onclick=()=>accountSecurityModal.classList.add("hidden");$("sendResetVisible").onclick=sendResetEmailVisible;$("verifyEmailVisible").onclick=resendVerification;
+chatSecurityBtn.onclick=openChatSecurity;$("closeChatSecurity").onclick=()=>chatSecurityModal.classList.add("hidden");chatBlockAction.onclick=async()=>{await blockSelectedUser();await updateChatSecurityLabels()};chatReportAction.onclick=async()=>{await reportSelectedUser();chatSecurityModal.classList.add("hidden")};chatLockAction.onclick=async()=>{await lockCurrentChat();await updateChatSecurityLabels()};
+$("closeSettings").onclick=()=>settingsModal.classList.add("hidden");
+
+$("settingsLogoutBtn").onclick=async()=>{
+  settingsModal.classList.add("hidden");
+  await setPresence(false);
+  cleanupRealtimeListeners();
+  await signOut(auth);
+};
+
+
+/* ===== SHAANCHAT QR SYSTEM ===== */
+function getAppUrl(){
+  return `${location.origin}${location.pathname}`;
+}
+function getProfileQrUrl(user=myProfileData){
+  const username=normalizeUsername(user?.username||"");
+  if(!username)return `${getAppUrl()}?profile=login-required`;
+  return `${getAppUrl()}?add=${encodeURIComponent(username)}`;
+}
+function makeQr(target, text, size=170){
+  if(!target)return;
+  safeSetHTML(target, "");
+  if(typeof QRCode==="undefined"){
+    target.textContent="QR library unavailable. Reload the app.";return;
+  }
+  new QRCode(target,{text,width:size,height:size,colorDark:"#07111f",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.M});
+}
+function downloadQr(target,filename){
+  const canvas=target?.querySelector("canvas"),img=target?.querySelector("img");
+  let src=canvas?.toDataURL("image/png")||img?.src;
+  if(!src)return toastMsg("QR is not ready yet.");
+  const a=document.createElement("a");a.href=src;a.download=filename;a.click();
+}
+async function shareText(title,text,url){
+  try{
+    if(navigator.share){await navigator.share({title,text,url});}
+    else{await navigator.clipboard.writeText(url);toastMsg("Link copied");}
+  }catch(e){if(e?.name!=="AbortError")toastMsg("Share cancelled");}
+}
+function renderQrCenter(){
+  const profileUrl=getProfileQrUrl();
+  const appUrl=getAppUrl();
+  makeQr(profileQrBox,profileUrl,170); makeQr(appQrBox,appUrl,170);
+  $("profileQrLabel").textContent=currentUser ? (myProfileData.username?`@${myProfileData.username}`:(myProfileData.name||"My Profile")) : "Login to create your profile QR";
+  $("profileQrUrl").textContent=profileUrl; $("appQrUrl").textContent=appUrl;
+}
+function openQrCenter(){renderQrCenter();qrCenterModal.classList.remove("hidden");}
+async function stopQrScanner(){
+  if(qrScanner&&qrScannerRunning){try{await qrScanner.stop();}catch(e){console.warn("QR stop",e)} }
+  qrScannerRunning=false;
+  try{qrScanner?.clear();}catch(_){ }
+}
+async function handleQrResult(decodedText){
+  await stopQrScanner();qrScannerModal.classList.add("hidden");
+  let u;
+  try{u=new URL(decodedText,location.href)}catch(_){return toastMsg("Invalid QR code.");}
+  if(u.origin!==location.origin || u.pathname!==location.pathname)return toastMsg("This QR is not a ShaanChat link.");
+  const add=u.searchParams.get("add");
+  if(add){
+    qrCenterModal.classList.add("hidden");
+    await processFriendQr(add);
+    return;
+  }
+  toastMsg("ShaanChat QR scanned successfully. Open the link to continue.");
+}
+async function startQrScanner(){
+  qrScannerModal.classList.remove("hidden");
+  if(typeof Html5Qrcode==="undefined")return toastMsg("QR scanner library unavailable. Reload the app.");
+  await stopQrScanner();
+  qrScanner=new Html5Qrcode("qrReader");
+  try{
+    await qrScanner.start({facingMode:"environment"},{fps:10,qrbox:{width:240,height:240}},handleQrResult,()=>{});
+    qrScannerRunning=true;
+  }catch(e){console.error("QR camera:",e);toastMsg("Camera could not start. Check HTTPS and camera permission.");}
+}
+async function processFriendQr(identifier){
+  if(!currentUser)return toastMsg("Please login first, then scan the profile QR.");
+  const value=String(identifier||"").trim();if(!value)return;
+  try{
+    let snap;
+    if(value.includes("@")){
+      const username=value.replace(/^@/,'').toLowerCase();
+      snap=await getDocs(query(collection(db,"users"),where("usernameLower","==",username)));
+    }else if(value.includes("@")===false && value.length>15){
+      const direct=await getDoc(doc(db,"users",value));
+      snap={empty:!direct.exists(),docs:direct.exists()?[direct]:[]};
+    }else{
+      snap=await getDocs(query(collection(db,"users"),where("usernameLower","==",value.toLowerCase())));
+    }
+    if(snap.empty)return toastMsg("ShaanChat profile not found.");
+    const u={id:snap.docs[0].id,...snap.docs[0].data()};
+    if(u.id===currentUser.uid)return toastMsg("That is your own profile QR.");
+    const ok=confirm(`Add ${u.name||"this person"}${u.username?` (@${u.username})`:""} as a friend?`);
+    if(!ok)return;
+    await sendFriendRequest(u); await openChat(u);
+    history.replaceState({},document.title,location.pathname);
+  }catch(e){console.error("Profile QR:",e);toastMsg("Could not process profile QR: "+(e?.message||"Unknown error"));}
+}
+async function handleProfileQrLink(){
+  const params=new URLSearchParams(location.search);const add=params.get("add");
+  if(add&&currentUser){
+    try{const snap=await getDoc(doc(db,"users",currentUser.uid));if(snap.exists())myProfileData=snap.data()||{};}catch(_){}
+    await processFriendQr(add);
+  }
+}
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredInstallPrompt=e;});
+async function installShaanChat(){
+  if(deferredInstallPrompt){deferredInstallPrompt.prompt();try{await deferredInstallPrompt.userChoice;}catch(_){}deferredInstallPrompt=null;return;}
+  if(/iphone|ipad|ipod/i.test(navigator.userAgent))return toastMsg("On iPhone: Share → Add to Home Screen.");
+  toastMsg("Open this link in your browser and use Install app / Add to Home Screen.");
+}
+
+$("qrCenterBtn").onclick=()=>{settingsModal.classList.add("hidden");openQrCenter();};
+$("profileQrBtn").onclick=()=>{profileModal.classList.add("hidden");openQrCenter();};
+$("scanQrBtn").onclick=startQrScanner;
+$("authQrBtn").onclick=()=>{qrCenterModal.classList.remove("hidden");renderQrCenter();};
+$("closeQrCenter").onclick=()=>qrCenterModal.classList.add("hidden");
+$("doneQrCenter").onclick=()=>qrCenterModal.classList.add("hidden");
+$("openScannerFromCenter").onclick=startQrScanner;
+$("closeQrScanner").onclick=async()=>{await stopQrScanner();qrScannerModal.classList.add("hidden")};
+$("stopQrScanner").onclick=stopQrScanner;
+$("downloadProfileQr").onclick=()=>downloadQr(profileQrBox,"shaanchat-profile-qr.png");
+$("downloadAppQr").onclick=()=>downloadQr(appQrBox,"shaanchat-install-qr.png");
+$("shareProfileQr").onclick=()=>shareText("ShaanChat Profile",`Add ${myProfileData.name||"me"} on ShaanChat`,getProfileQrUrl());
+$("copyProfileQrLink").onclick=async()=>{try{await navigator.clipboard.writeText(getProfileQrUrl());toastMsg("Profile link copied")}catch(_){toastMsg(getProfileQrUrl())}};
+$("installAppBtn").onclick=installShaanChat;
+$("qrManualLinkBtn").onclick=async()=>{const link=prompt("Paste a ShaanChat profile QR link:","");if(link)await handleQrResult(link)};
+
+$("profileBtn").onclick=async()=>{
+  settingsModal.classList.add("hidden");
+  const s=await getDoc(doc(db,"users",currentUser.uid));
+  const d=s.data()||{};
+  $("profileName").value=d.name||"";
+  profileUsername.value=d.username||"";
+  renderAvatar(profilePhotoPreview,d.photoURL,d.name);
+  if(d.photoURL){
+    profilePhotoPreview.onclick=()=>openProfileImage(d.photoURL,d.name);
+  }else{
+    profilePhotoPreview.onclick=()=>toastMsg("No profile photo uploaded yet.");
+  }
+  profileModal.classList.remove("hidden");
+};
+$("saveProfile").onclick=async()=>{
+  const name=$("profileName").value.trim();
+  const username=normalizeUsername(profileUsername.value);
+  if(!name)return toastMsg("Enter a name.");
+
+  try{
+    validateUsername(username);
+    toastMsg("Checking username...");
+    const usernameSnap=await getDocs(query(collection(db,"users"),where("usernameLower","==",username)));
+    const takenByOther=usernameSnap.docs.some(x=>x.id!==currentUser.uid);
+    if(takenByOther)return toastMsg("Username already taken. Choose another.");
+
+    toastMsg("Saving profile...");
+    const f=$("profilePhoto").files?.[0];
+    const photoURL=f?await imageToCloudinary(f,`shaanchat/profiles/${currentUser.uid}`):null;
+    const update={name,username,usernameLower:username,updatedAt:serverTimestamp()};
+    if(photoURL)update.photoURL=photoURL;
+
+    await updateDoc(doc(db,"users",currentUser.uid),update);
+    await loadMyProfile();
+    const freshProfile=await getDoc(doc(db,"users",currentUser.uid));
+    const freshData=freshProfile.data()||{};
+    renderAvatar(profilePhotoPreview,freshData.photoURL,freshData.name);
+    if(freshData.photoURL)profilePhotoPreview.onclick=()=>openProfileImage(freshData.photoURL,freshData.name);
+    profileModal.classList.add("hidden");
+    toastMsg(photoURL?"Profile photo updated":"Profile updated");
+  }catch(e){
+    console.error("Profile save:",e);
+    toastMsg("Profile upload failed: "+(e?.message||"Unknown error"));
+  }
+};
+
+$("groupBtn").onclick=()=>{
+  settingsModal.classList.add("hidden");
+  $("groupName").value="";const box=$("groupUsers");safeSetHTML(box, "");
+  allUsers.filter(u=>!u.isGroup).forEach(u=>{const row=document.createElement("label");row.className="check-item";safeSetHTML(row, `<input type="checkbox" value="${escAttr(u.id)}"> <span>${esc(u.name||u.email)}</span>`);box.appendChild(row)});
+  groupModal.classList.remove("hidden");
+};
+$("createGroup").onclick=async()=>{
+  const btn=$("createGroup");
+  const name=$("groupName").value.trim();
+  const ids=[...document.querySelectorAll("#groupUsers input:checked")].map(x=>x.value);
+  if(!name||!ids.length){
+    return toastMsg("Enter a group name and select at least one user.");
+  }
+  if(!currentUser)return toastMsg("Please login again.");
+
+  btn.disabled=true;
+  const oldText=btn.textContent;
+  btn.textContent="Creating…";
+
+  try{
+    const participants=[...new Set([currentUser.uid,...ids])];
+
+    // Main group document.
+    const c=await addDoc(collection(db,"chats"),{
+      type:"group",
+      name,
+      description:"",
+      photoURL:null,
+      participants,
+      createdBy:currentUser.uid,
+      admins:[currentUser.uid],
+      archivedBy:{},
+      permissions:{
+        addMembers:true,
+        removeMembers:true,
+        editInfo:true
+      },
+      createdAt:serverTimestamp(),
+      updatedAt:serverTimestamp(),
+      typing:{}
+    });
+
+    // Lightweight index used by the sidebar.
+    const groupIndexData={
+      chatId:c.id,
+      name,
+      description:"",
+      photoURL:null,
+      participants,
+      createdBy:currentUser.uid,
+      admins:[currentUser.uid],
+      archivedBy:{},
+      permissions:{
+        addMembers:true,
+        removeMembers:true,
+        editInfo:true
+      },
+      createdAt:serverTimestamp(),
+      updatedAt:serverTimestamp()
+    };
+    await setDoc(doc(db,"groupIndex",c.id),groupIndexData);
+
+    // IMPORTANT: immediately add the new group to the local sidebar.
+    // This fixes the "group created but not visible" issue even if the
+    // groupIndex query has a short delay or is temporarily unavailable.
+    const newGroup={
+      id:c.id,
+      chatId:c.id,
+      isGroup:true,
+      ...groupIndexData
+    };
+    allUsers=[
+      ...allUsers.filter(u=>!u.isGroup && u.id!==c.id),
+      ...allUsers.filter(u=>u.isGroup && u.id!==c.id),
+      newGroup
+    ];
+    renderUsers(allUsers);
+
+    // Close/reset modal only after both writes succeed.
+    $("groupName").value="";
+    document.querySelectorAll("#groupUsers input").forEach(x=>x.checked=false);
+    groupModal.classList.add("hidden");
+
+    toastMsg(`"${name}" created successfully`);
+
+    // Refresh from Firestore as a consistency check.
+    await loadGroupIndex();
+
+    // Open the newly-created group automatically.
+    const groupEl=usersList.querySelector(`[data-group-id="${c.id}"]`);
+    if(groupEl)groupEl.click();
+  }catch(e){
+    console.error("Group create failed:",e);
+    toastMsg("Group create failed: "+(e?.message||"Unknown error"));
+  }finally{
+    btn.disabled=false;
+    btn.textContent=oldText;
+  }
+};
+
+async function archiveGroup(group){
+  if(!group?.isGroup)return;
+  try{
+    await updateDoc(doc(db,"chats",group.id),{
+      [`archivedBy.${currentUser.uid}`]:true
+    });
+    try{
+      await updateDoc(doc(db,"groupIndex",group.id),{
+        [`archivedBy.${currentUser.uid}`]:true
+      });
+    }catch(_){}
+    if(selectedChat?.id===group.id){
+      selectedChat=null;
+      groupSettingsBtn.classList.add("hidden");
+      voiceCallBtn.classList.add("hidden");
+      videoCallBtn.classList.add("hidden");
+      chatName.textContent="Select a user";
+      chatStatus.textContent="Start a conversation";
+      safeSetHTML(messages, '<div class="empty">Group archived.</div>');
+    }
+    toastMsg("Group archived for you");
+    loadGroupIndex();
+  }catch(e){
+    console.error(e);
+    toastMsg("Archive failed: "+e.message);
+  }
+}
+
+async function deleteGroup(group){
+  if(!group?.isGroup)return;
+  if(group.createdBy!==currentUser.uid){
+    toastMsg("Only the group creator can delete this group.");
+    return;
+  }
+  if(!confirm(`Delete "${group.name}" for everyone?`))return;
+  try{
+    // Delete the group document and its index. Existing message subdocuments
+    // may remain in Firestore until cleanup, but the group becomes inaccessible.
+    await deleteDoc(doc(db,"chats",group.id));
+    try{await deleteDoc(doc(db,"groupIndex",group.id));}catch(_){}
+
+    if(selectedChat?.id===group.id){
+      selectedChat=null;
+      groupSettingsBtn.classList.add("hidden");
+      voiceCallBtn.classList.add("hidden");
+      videoCallBtn.classList.add("hidden");
+      chatName.textContent="Select a user";
+      chatStatus.textContent="Start a conversation";
+      safeSetHTML(messages, '<div class="empty">Group deleted.</div>');
+    }
+    toastMsg("Group deleted");
+    loadGroupIndex();
+  }catch(e){
+    console.error(e);
+    toastMsg("Delete group failed: "+e.message);
+  }
+};
+async function loadGroupIndex(){
+  if(!currentUser)return;
+  try{
+    const snap=await getDocs(
+      query(collection(db,"groupIndex"),where("participants","array-contains",currentUser.uid))
+    );
+    const groups=[];
+    snap.forEach(x=>{
+      const d=x.data()||{};
+      if((d.participants||[]).includes(currentUser.uid)
+         && !(d.archivedBy&&d.archivedBy[currentUser.uid])){
+        groups.push({id:x.id,chatId:x.id,isGroup:true,...d});
+      }
+    });
+
+    // Keep the People list from the live users listener and replace only Groups.
+    const people=allUsers.filter(x=>!x.isGroup);
+    allUsers=[...people,...groups];
+    renderUsers(allUsers);
+  }catch(e){
+    // Do not erase an already-created group when groupIndex is temporarily
+    // unavailable (rules, network, or a short Firestore propagation delay).
+    console.warn("Group index:",e.message);
+    renderUsers(allUsers);
+  }
+}
+setInterval(()=>{if(currentUser)loadGroupIndex()},10000);
+
+searchUsers.oninput=()=>{
+  renderUsers(allUsers);
+};
+$("searchMessagesBtn").onclick=()=>{
+  if(!selectedChat)return toastMsg("Select a chat first");
+  $("messageSearchInput").value="";renderSearchResults("");searchModal.classList.remove("hidden");
+};
+$("messageSearchInput").oninput=e=>renderSearchResults(e.target.value.toLowerCase());
+function renderSearchResults(term){
+  const box=$("messageSearchResults");
+  const q=String(term||"").trim().toLowerCase();
+  const arr=loadedMessages.filter(d=>(d.text||d.fileName||"").toLowerCase().includes(q));
+  box.replaceChildren();
+  if(!arr.length){box.textContent="No matches.";return;}
+  arr.forEach(d=>{
+    const row=document.createElement("button");
+    row.type="button";row.className="w-full text-left";
+    row.style.cssText="padding:10px;border-bottom:1px solid var(--line);background:transparent;color:inherit;cursor:pointer";
+    row.textContent=d.text||d.fileName||"Attachment";
+    row.addEventListener("click",()=>{
+      scrollToMessage(messages,d.id);
+      searchModal.classList.add("hidden");
+    });
+    box.appendChild(row);
+  });
+}
+
+groupSettingsBtn.onclick=()=>openGroupSettings(selectedUser);
+groupInfoBtn.onclick=async()=>{
+  if(!selectedUser?.isGroup)return;
+  const data=await getGroupData(selectedUser.id); if(!data)return toastMsg("Group not found.");
+  const members=(data.participants||[]).length, admins=(data.admins||[]).length;
+  let owner="Group admin"; if(data.createdBy===currentUser.uid)owner="You"; else {const s=await getDoc(doc(db,"users",data.createdBy)); owner=s.data()?.name||owner;}
+  alert(`ShaanChat Group\n\nName: ${data.name||"Group"}\nDescription: ${data.description||"—"}\nMembers: ${members}\nAdmins: ${admins}\nOwner: ${owner}\n\nPermissions\n• Add members: ${data.permissions?.addMembers!==false?"ON":"OFF"}\n• Remove members: ${data.permissions?.removeMembers!==false?"ON":"OFF"}\n• Edit group info: ${data.permissions?.editInfo!==false?"ON":"OFF"}`);
+};
+
+saveGroupSettings.onclick=async()=>{
+  if(!selectedUser?.isGroup)return;
+  try{
+    const data=await getGroupData(selectedUser.id);
+    if(!data)return toastMsg("Group not found.");
+    if(!groupPermission(data,"editInfo"))return toastMsg("You don't have permission to edit group info.");
+
+    const name=groupSettingsName.value.trim();
+    const description=groupDescription.value.trim();
+    if(!name)return toastMsg("Enter group name.");
+
+    let photoURL=data.photoURL||null;
+    const f=groupPhotoInput.files?.[0];
+    if(f){
+      photoURL=await imageToCloudinary(f,`shaanchat/groups/${data.id}`);
+    }
+
+    const permissions={
+      addMembers:permAddMembers.checked,
+      removeMembers:permRemoveMembers.checked,
+      editInfo:permEditInfo.checked
+    };
+
+    const update={name,description,photoURL,permissions,updatedAt:serverTimestamp()};
+    await updateDoc(doc(db,"chats",data.id),update);
+    await syncGroupIndex(data.id,{...data,...update,updatedAt:undefined});
+
+    selectedUser={...selectedUser,name,description,photoURL,permissions};
+    chatName.textContent=name;
+    renderAvatar(chatAvatar,photoURL,name);
+    groupPhotoInput.value="";
+    groupSettingsModal.classList.add("hidden");
+    toastMsg("Group settings saved");
+    loadGroupIndex();
+  }catch(e){
+    console.error("Save group settings:",e);
+    toastMsg("Save failed: "+(e.message||"Unknown error"));
+  }
+};
+
+leaveGroupBtn.onclick=async()=>{
+  if(!selectedUser?.isGroup)return;
+  const data=await getGroupData(selectedUser.id);
+  if(!data)return toastMsg("Group not found.");
+  if(data.createdBy===currentUser.uid)return toastMsg("Creator cannot leave. Transfer ownership first from Members.");
+  if(!confirm(`Leave "${data.name||"this group"}"?`))return;
+  try{
+    const participants=(data.participants||[]).filter(x=>x!==currentUser.uid);
+    const admins=(data.admins||[]).filter(x=>x!==currentUser.uid);
+    await updateDoc(doc(db,"chats",data.id),{participants,admins,updatedAt:serverTimestamp()});
+    await syncGroupIndex(data.id,{...data,participants,admins,updatedAt:undefined});
+    groupSettingsModal.classList.add("hidden");
+    selectedUser=null;selectedChat=null;
+    app.classList.remove("chat-open");
+    groupSettingsBtn.classList.add("hidden");
+    chatName.textContent="Select a user";
+    chatUsername.textContent="";
+    chatStatus.textContent="Start a conversation";
+    safeSetHTML(messages, '<div class="empty">Select a user to start chatting 💬</div>');
+    messageInput.disabled=true;sendBtn.disabled=true;
+    loadGroupIndex();
+    toastMsg("You left the group");
+  }catch(e){console.error(e);toastMsg("Leave failed: "+e.message)}
+};
+
+inviteGroupBtn.onclick=async()=>{
+  if(!selectedUser?.isGroup)return;
+  const inviteUrl=`${location.origin}${location.pathname}?group=${encodeURIComponent(selectedUser.id)}`;
+  try{
+    if(navigator.share){
+      await navigator.share({title:"Join my ShaanChat group",text:`Join ${selectedUser.name||"our group"} on ShaanChat`,url:inviteUrl});
+    }else{
+      await navigator.clipboard.writeText(inviteUrl);
+      toastMsg("Group invite link copied");
+    }
+  }catch(e){
+    if(e.name!=="AbortError"){
+      try{await navigator.clipboard.writeText(inviteUrl);toastMsg("Invite link copied");}
+      catch(_){prompt("Copy this group invite link:",inviteUrl)}
+    }
+  }
+};
+
+const addMembersBtn=document.createElement("button");
+addMembersBtn.className="small-btn";
+addMembersBtn.textContent="➕ Add members";
+addMembersBtn.id="addGroupMembersBtn";
+groupSettingsModal.querySelector(".modal-actions").insertBefore(addMembersBtn,groupSettingsModal.querySelector("[data-close='groupSettingsModal']"));
+addMembersBtn.onclick=async()=>{
+  if(!selectedUser?.isGroup)return;
+  const data=await getGroupData(selectedUser.id);
+  if(data)await addGroupMembers(data);
+};
+
+
+/* =========================
+   STEP 10 — 1-to-1 CALLS
+   Firestore = signaling, WebRTC = media
+   ========================= */
+
+function callUserDoc(uid){ return doc(db,"users",uid); }
+
+function clearCallListeners(){
+  if(unsubscribeCallDoc){unsubscribeCallDoc();unsubscribeCallDoc=null}
+  if(unsubscribeCallerCandidates){unsubscribeCallerCandidates();unsubscribeCallerCandidates=null}
+  if(unsubscribeCalleeCandidates){unsubscribeCalleeCandidates();unsubscribeCalleeCandidates=null}
+}
+
+function resetCallUI(){
+  clearInterval(callTimer);callTimer=null;clearTimeout(callTimeoutTimer);callTimeoutTimer=null;callStartedAt=0;if(callTimerEl)callTimerEl.textContent="00:00";
+  incomingCallModal.classList.add("hidden");
+  activeCallModal.classList.add("hidden");
+  videoStage.classList.add("hidden");
+  audioCallVisual.classList.remove("hidden");
+  remoteVideo.srcObject=null; localVideo.srcObject=null;
+  activeCallStatus.textContent="Connecting…";
+  muteCallBtn.textContent="🎤";cameraCallBtn.textContent="📹";
+  speakerCallBtn.textContent="🔊";
+  muteCallBtn.classList.remove("active");cameraCallBtn.classList.remove("active");speakerCallBtn.classList.remove("active");
+  flipCameraBtn.classList.add("hidden");
+  incomingCallRinging.textContent="🔔 Ringing…";
+}
+
+async function cleanupCall(deleteDocToo=true){
+  stopRingtone();
+  const callId=currentCallId;
+  clearCallListeners();
+  try{peerConnection?.close()}catch(_){}
+  peerConnection=null;
+  if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null}
+  currentCallId=null;currentCallType=null;currentCallRole=null;incomingCallData=null;
+  cameraFacingMode="user";
+  stopCallTimer();resetCallUI();
+  if(deleteDocToo && callId){
+    try{await deleteDoc(doc(db,"calls",callId))}catch(_){}
+  }
+}
+
+async function getCallMedia(type){
+  if(!navigator.mediaDevices?.getUserMedia)throw new Error("Camera/microphone is not supported.");
+  return await navigator.mediaDevices.getUserMedia({
+    audio:true,
+    video:type==="video"?{facingMode:cameraFacingMode,width:{ideal:1280},height:{ideal:720}}:false
+  });
+}
+
+function startCallTimer(){
+  clearInterval(callTimer);
+  callStartedAt=Date.now();
+  const tick=()=>{
+    const sec=Math.floor((Date.now()-callStartedAt)/1000);
+    const m=String(Math.floor(sec/60)).padStart(2,"0");
+    const s=String(sec%60).padStart(2,"0");
+    if(callTimerEl)callTimerEl.textContent=`${m}:${s}`;
+  };
+  tick();callTimer=setInterval(tick,1000);
+}
+function stopCallTimer(){clearInterval(callTimer);callTimer=null;}
+
+function showActiveCall(type,name,userData){
+  activeCallName.textContent=name||"Call";
+  renderAvatar(activeCallAvatar,userData?.photoURL,name);
+  audioCallLabel.textContent=type==="video"?"Video call":"Voice call";
+  activeCallStatus.textContent="Connecting…";
+  if(type==="video"){
+    videoStage.classList.remove("hidden");audioCallVisual.classList.add("hidden");
+    cameraCallBtn.classList.remove("hidden");flipCameraBtn.classList.remove("hidden");
+  }else{
+    videoStage.classList.add("hidden");audioCallVisual.classList.remove("hidden");
+    cameraCallBtn.classList.add("hidden");
+  }
+  activeCallModal.classList.remove("hidden");
+}
+
+async function restartIceCall(){
+  if(!currentCallId||!peerConnection||!currentUser)return;
+  try{
+    const offer=await peerConnection.createOffer({iceRestart:true});
+    await peerConnection.setLocalDescription(offer);
+    await updateDoc(doc(db,"calls",currentCallId),{
+      offer:{type:offer.type,sdp:offer.sdp},
+      iceRestartAt:Date.now(),
+      status:currentCallRole==="caller"?"ringing":"accepted"
+    });
+    activeCallStatus.textContent="Reconnecting…";
+  }catch(e){console.warn("ICE restart:",e);}
+}
+
+function setupPeerConnection(callId,role,type,remoteId){
+  peerConnection=createPeerConnection(getRtcConfig(),{
+    onIceRestartNeeded:()=>restartIceCall()
+  });
+
+  peerConnection.ontrack=e=>{
+    if(e.streams?.[0]){
+      remoteVideo.srcObject=e.streams[0];
+      remoteVideo.autoplay=true;
+      remoteVideo.playsInline=true;
+      remoteVideo.muted=false;
+      remoteVideo.volume=1;
+      remoteVideo.play().then(()=>{
+        activeCallStatus.textContent="Connected";
+      }).catch(()=>{
+        activeCallStatus.textContent="Connected • tap 🔈 for sound";
+        speakerCallBtn.classList.add("disabled");
+      });
+    }
+  };
+
+  peerConnection.onconnectionstatechange=()=>{
+    const state=peerConnection.connectionState;
+    if(state==="connected"){
+      stopRingtone();
+      activeCallStatus.textContent="Connected";
+      startCallTimer();
+    }
+    if(state==="connecting")activeCallStatus.textContent="Connecting…";
+    if(state==="disconnected"||state==="failed"){
+      activeCallStatus.textContent="Call ended";
+      setTimeout(()=>cleanupCall(true),800);
+    }
+  };
+
+  peerConnection.onicecandidate=async e=>{
+    if(!e.candidate)return;
+    const sub=role==="caller"?"callerCandidates":"calleeCandidates";
+    try{
+      await addDoc(collection(db,"calls",callId,sub),e.candidate.toJSON());
+    }catch(err){console.warn("ICE candidate:",err)}
+  };
+
+  return peerConnection;
+}
+
+function listenRemoteCandidates(callId,role){
+  const sub=role==="caller"?"calleeCandidates":"callerCandidates";
+  const unsub=onSnapshot(collection(db,"calls",callId,sub),snap=>{
+    snap.docChanges().forEach(change=>{
+      if(change.type==="added" && peerConnection){
+        peerConnection.addIceCandidate(new RTCIceCandidate(change.doc.data())).catch(()=>{});
+      }
+    });
+  });
+  if(role==="caller")unsubscribeCalleeCandidates=unsub;
+  else unsubscribeCallerCandidates=unsub;
+}
+
+async function startCall(type){
+  if(!currentUser||!selectedUser||selectedUser.isGroup)return toastMsg("Calls are available for 1-to-1 chats only.");
+  if(currentCallId)return toastMsg("You are already on a call.");
+  try{
+    const callRef=doc(collection(db,"calls"));
+    const callId=callRef.id;
+    currentCallId=callId;currentCallType=type;currentCallRole="caller";lastHandledIceRestartAt=0;
+
+    localStream=await getCallMedia(type);
+    localVideo.srcObject=localStream;
+    showActiveCall(type,selectedUser.name,selectedUser);
+
+    setupPeerConnection(callId,"caller",type,selectedUser.id);
+    localStream.getTracks().forEach(track=>peerConnection.addTrack(track,localStream));
+
+    const offer=await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+
+    await setDoc(callRef,{
+      callId,callerId:currentUser.uid,calleeId:selectedUser.id,
+      callerName:myName.textContent,callerPhotoURL:myAvatar.dataset.photoUrl||null,
+      type,status:"ringing",offer:{type:offer.type,sdp:offer.sdp},
+      createdAt:serverTimestamp()
+    });
+
+    listenRemoteCandidates(callId,"caller");
+
+    unsubscribeCallDoc=onSnapshot(callRef,async snap=>{
+      if(!snap.exists())return;
+      const data=snap.data();
+      if(data.status==="accepted" && data.answer && !peerConnection.currentRemoteDescription){
+        clearTimeout(callTimeoutTimer);
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+        activeCallStatus.textContent="Connecting…";
+      }
+      if(data.status==="rejected"||data.status==="ended"){
+        toastMsg(data.status==="rejected"?"Call rejected":"Call ended");
+        await cleanupCall(false);
+      }
+    });
+    activeCallStatus.textContent="Ringing…";
+    startRingtone();
+    clearTimeout(callTimeoutTimer);
+    callTimeoutTimer=setTimeout(async()=>{
+      if(currentCallId===callId){
+        try{await updateDoc(callRef,{status:"ended",endedAt:serverTimestamp()})}catch(_){}
+        await cleanupCall(false);
+        toastMsg("No answer");
+      }
+    },30000);
+  }catch(e){
+    console.error("Start call:",e);
+    await cleanupCall(false);
+    toastMsg("Could not start call: "+(e.message||"Permission denied"));
+  }
+}
+
+async function acceptIncomingCall(){
+  const data=incomingCallData;
+  if(!data)return;
+  try{
+    clearTimeout(callTimeoutTimer);
+    stopRingtone();
+    incomingCallAvatar.classList.remove("incoming-call-pulse");
+    incomingCallModal.classList.add("hidden");
+    // Accept is a real user gesture: unlock browser audio here.
+    try{if(ringtoneCtx?.state==="suspended")await ringtoneCtx.resume();}catch(_){}
+    currentCallId=data.callId;currentCallType=data.type;currentCallRole="callee";lastHandledIceRestartAt=0;
+    localStream=await getCallMedia(data.type);
+    localVideo.srcObject=localStream;
+
+    const caller={name:data.callerName||"User",photoURL:data.callerPhotoURL||null};
+    showActiveCall(data.type,caller.name,caller);
+
+    setupPeerConnection(data.callId,"callee",data.type,data.callerId);
+    localStream.getTracks().forEach(track=>peerConnection.addTrack(track,localStream));
+
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+    const answer=await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+
+    clearTimeout(callTimeoutTimer);
+    await updateDoc(doc(db,"calls",data.callId),{
+      status:"accepted",
+      answer:{type:answer.type,sdp:answer.sdp},
+      acceptedAt:serverTimestamp()
+    });
+
+    listenRemoteCandidates(data.callId,"callee");
+
+    unsubscribeCallDoc=onSnapshot(doc(db,"calls",data.callId),async snap=>{
+      if(!snap.exists()){await cleanupCall(false);return}
+      const d=snap.data();
+      if(d.status==="ended"||d.status==="rejected"){
+        toastMsg("Call ended");await cleanupCall(false);
+      }
+      if(d.iceRestartOffer && d.iceRestartAt && d.iceRestartAt!==lastHandledIceRestartAt && peerConnection){
+        lastHandledIceRestartAt=d.iceRestartAt;
+        try{
+          await peerConnection.setRemoteDescription(new RTCSessionDescription(d.iceRestartOffer));
+          const answer=await peerConnection.createAnswer();
+          await peerConnection.setLocalDescription(answer);
+          await updateDoc(doc(db,"calls",data.callId),{
+            answer:{type:answer.type,sdp:answer.sdp},
+            status:"accepted"
+          });
+        }catch(err){console.warn("ICE restart answer:",err);}
+      }
+    });
+  }catch(e){
+    console.error("Accept call:",e);
+    try{await updateDoc(doc(db,"calls",data.callId),{status:"rejected"})}catch(_){}
+    await cleanupCall(false);
+    toastMsg("Could not accept call: "+(e.message||"Permission denied"));
+  }
+}
+
+async function rejectIncomingCall(){
+  const data=incomingCallData;
+  clearTimeout(callTimeoutTimer);
+  stopRingtone();
+  incomingCallAvatar.classList.remove("incoming-call-pulse");
+  incomingCallData=null;
+  incomingCallModal.classList.add("hidden");
+  if(data?.callId){
+    try{await updateDoc(doc(db,"calls",data.callId),{status:"rejected"})}catch(_){}
+  }
+}
+
+async function endCurrentCall(){
+  const callId=currentCallId;
+  if(callId){
+    try{await updateDoc(doc(db,"calls",callId),{status:"ended",endedAt:serverTimestamp()})}catch(_){}
+  }
+  await cleanupCall(false);
+  toastMsg("Call ended");
+}
+
+async function initIncomingCalls(){
+  if(!currentUser)return;
+  if(unsubscribeIncomingCalls)unsubscribeIncomingCalls();
+  // Query only calleeId so no composite Firestore index is required.
+  const q=query(collection(db,"calls"),where("calleeId","==",currentUser.uid));
+  unsubscribeIncomingCalls=onSnapshot(q,snap=>{
+    snap.docChanges().forEach(change=>{
+      if(change.type!=="added" || currentCallId)return;
+      const d={id:change.doc.id,...change.doc.data()};
+      if(d.calleeId!==currentUser.uid || d.status!=="ringing")return;
+      incomingCallData=d;
+      incomingCallName.textContent=d.callerName||"User";
+      incomingCallType.textContent=d.type==="video"?"📹 Incoming video call":"📞 Incoming voice call";
+      incomingCallRinging.textContent="🔔 Ringing…";
+      renderAvatar(incomingCallAvatar,d.callerPhotoURL,d.callerName||"User");
+      incomingCallAvatar.classList.add("incoming-call-pulse");
+      incomingCallModal.classList.remove("hidden");
+      startRingtone();
+      clearTimeout(callTimeoutTimer);
+      callTimeoutTimer=setTimeout(async()=>{
+        if(incomingCallData?.callId===d.callId){
+          try{await updateDoc(doc(db,"calls",d.callId),{status:"ended",endedAt:serverTimestamp()})}catch(_){}
+          incomingCallData=null;
+          stopRingtone();
+          incomingCallAvatar.classList.remove("incoming-call-pulse");
+          incomingCallModal.classList.add("hidden");
+          toastMsg("Missed call");
+        }
+      },45000);
+    });
+    snap.docChanges().forEach(change=>{
+      if(change.type==="modified" && incomingCallData?.callId===change.doc.id && change.doc.data().status!=="ringing"){
+        stopRingtone();
+        incomingCallAvatar.classList.remove("incoming-call-pulse");
+        incomingCallModal.classList.add("hidden");
+        incomingCallData=null;
+      }
+    });
+  },e=>console.warn("Incoming calls:",e));
+}
+
+voiceCallBtn.onclick=()=>startCall("voice");
+videoCallBtn.onclick=()=>startCall("video");
+acceptIncomingBtn.onclick=acceptIncomingCall;
+rejectIncomingBtn.onclick=rejectIncomingCall;
+endCallBtn.onclick=endCurrentCall;
+
+muteCallBtn.onclick=()=>{
+  const track=localStream?.getAudioTracks?.()[0];
+  if(!track)return;
+  track.enabled=!track.enabled;
+  muteCallBtn.textContent=track.enabled?"🎤":"🔇";
+  muteCallBtn.classList.toggle("active",!track.enabled);
+};
+
+cameraCallBtn.onclick=()=>{
+  const track=localStream?.getVideoTracks?.()[0];
+  if(!track)return;
+  track.enabled=!track.enabled;
+  cameraCallBtn.textContent=track.enabled?"📹":"🚫";
+  cameraCallBtn.classList.toggle("active",!track.enabled);
+};
+
+async function enableCallSound(){
+  try{
+    if(ringtoneCtx?.state==="suspended")await ringtoneCtx.resume();
+    remoteVideo.muted=false;
+    remoteVideo.volume=1;
+    await remoteVideo.play();
+    speakerCallBtn.textContent="🔊";
+    speakerCallBtn.classList.remove("disabled");
+    toastMsg("Call sound enabled");
+  }catch(e){
+    console.warn("Call sound enable:",e);
+    toastMsg("Tap the speaker button to enable sound");
+  }
+}
+
+enableCallSoundBtn.onclick=enableCallSound;
+
+document.addEventListener("visibilitychange",()=>{
+  if(!document.hidden && currentCallId && remoteVideo.srcObject && !remoteVideo.muted){remoteVideo.play().catch(()=>{});}
+});
+
+speakerCallBtn.onclick=()=>{enableCallSound();};
+
+flipCameraBtn.onclick=async()=>{
+  if(currentCallType!=="video"||!localStream)return;
+  const videoTrack=localStream.getVideoTracks()[0];
+  if(!videoTrack)return;
+  try{
+    cameraFacingMode=cameraFacingMode==="user"?"environment":"user";
+    const newStream=await navigator.mediaDevices.getUserMedia({
+      audio:false,
+      video:{facingMode:cameraFacingMode,width:{ideal:1280},height:{ideal:720}}
+    });
+    const newTrack=newStream.getVideoTracks()[0];
+    const sender=peerConnection?.getSenders().find(s=>s.track?.kind==="video");
+    if(sender)await sender.replaceTrack(newTrack);
+    videoTrack.stop();
+    localStream.removeTrack(videoTrack);
+    localStream.addTrack(newTrack);
+    localVideo.srcObject=localStream;
+    cameraCallBtn.textContent="📹";
+  }catch(e){
+    cameraFacingMode=cameraFacingMode==="user"?"environment":"user";
+    toastMsg("Could not switch camera.");
+  }
+};
+
+window.addEventListener("beforeunload",()=>{
+  if(currentCallId){
+    try{navigator.sendBeacon(location.href,"")}catch(_){}
+  }
+});
+
+$("themeBtn").onclick=()=>{document.documentElement.classList.toggle("theme-light");localStorage.setItem("shaanTheme",document.documentElement.classList.contains("theme-light")?"light":"dark")};
+if(localStorage.getItem("shaanTheme")==="light")document.documentElement.classList.add("theme-light");
+updatePeopleVisibilityUI();
+backBtn.onclick=()=>app.classList.remove("chat-open");
+window.addEventListener("load",()=>{
+  groupSettingsBtn.classList.add("hidden");
+  voiceCallBtn.classList.add("hidden");
+  videoCallBtn.classList.add("hidden");
+  flipCameraBtn.classList.add("hidden");
+});
+logoutBtn.onclick=async()=>{await setPresence(false);await signOut(auth)};
+
+document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>$(b.dataset.close).classList.add("hidden"));
+window.onclick=e=>{
+  if(e.target.classList.contains("modal"))e.target.classList.add("hidden");
+};
+
+async function initNotifications(){
+  if(!("Notification"in window)||!await isSupported().catch(()=>false))return;
+  try{messaging=getMessaging(firebaseApp);onMessage(messaging,p=>toastMsg(p.notification?.title||"New message"))}catch(e){console.warn("FCM unavailable",e)}
+}
+$("notifyBtn").onclick=async()=>{
+  if(!messaging||!VAPID_KEY)return toastMsg("Add your Firebase Web Push VAPID key in the code first.");
+  try{
+    const permission=await Notification.requestPermission();if(permission!=="granted")return toastMsg("Notification permission denied.");
+   const reg = await navigator.serviceWorker.ready;
+    notificationToken=await getToken(messaging,{vapidKey:VAPID_KEY,serviceWorkerRegistration:reg});
+    await updateDoc(doc(db,"users",currentUser.uid),{fcmTokens:arrayUnion(notificationToken)});
+    toastMsg("Browser notifications enabled");
+  }catch(e){console.error(e);toastMsg("Notifications setup failed: "+e.message)}
+};
+
+function scrollMessages(){messages.scrollTop=messages.scrollHeight}
+function formatTime(date){return date.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}
+function toastMsg(text){toast.textContent=text;toast.classList.remove("hidden");clearTimeout(toast._t);toast._t=setTimeout(()=>toast.classList.add("hidden"),2800)}
+// ShaanChat PWA Service Worker
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("./service-worker.js?v=20260818-cloudinary-v3")
+      .then(registration => {
+        console.log("ShaanChat Service Worker registered:", registration.scope);
+      })
+      .catch(error => {
+        console.error("Service Worker registration failed:", error);
+      });
+  });
+}
+
+/* ============================================================
+   SHAANCHAT PRO UX ENGINE — runtime feature pack
+   Safe extension: uses localStorage for UI-only preferences and
+   does not change existing Firestore document schemas.
+   ============================================================ */
+(function ShaanChatProUX(){
+  "use strict";
+  const SC_KEY="shaanchat.pro.2026";
+  const state=JSON.parse(localStorage.getItem(SC_KEY)||"{}");
+  const saveState=()=>localStorage.setItem(SC_KEY,JSON.stringify(state));
+  const q=id=>document.getElementById(id);
+  const root=document.documentElement;
+  const body=document.body;
+  const safe=(fn)=>{try{return fn()}catch(e){console.warn("ShaanChat UX:",e);return null}};
+
+  const style=document.createElement("style");
+  style.textContent=`
+/* ============================================================
+   SHAANCHAT PRO UX ENGINE 2026
+   Non-breaking enhancement layer
+   ============================================================ */
+:root{
+  --sc-accent:#00eaff;
+  --sc-accent2:#7c3cff;
+  --sc-success:#48e6a1;
+  --sc-warning:#ffca62;
+  --sc-shadow:0 20px 60px rgba(0,0,0,.32);
+  --sc-radius:16px;
+}
+html{scroll-behavior:smooth}
+body,.app,.sidebar,.chat,.chat-header,.composer,.user,.message,.modal-card,.settings-item,.icon-btn,.small-btn,.search,.message-input{
+  transition:background-color .22s ease,border-color .22s ease,color .22s ease,box-shadow .22s ease,transform .18s ease,opacity .18s ease;
+}
+body.sc-reduced-motion *,body.sc-reduced-motion *::before,body.sc-reduced-motion *::after{
+  animation-duration:.001ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.001ms!important
+}
+.sc-app-topline{
+  position:fixed;left:50%;top:10px;transform:translateX(-50%) translateY(-80px);
+  z-index:1200;display:flex;align-items:center;gap:9px;max-width:min(92vw,520px);
+  padding:9px 13px;border:1px solid var(--line);border-radius:999px;background:rgba(13,20,33,.94);
+  backdrop-filter:blur(18px);box-shadow:var(--sc-shadow);font-size:12px;color:#dce7f6;
+  opacity:0;pointer-events:none;transition:.28s ease;
+}
+.sc-app-topline.show{transform:translateX(-50%) translateY(0);opacity:1}
+.sc-app-topline .dot{width:8px;height:8px;border-radius:50%;background:var(--sc-success);box-shadow:0 0 10px currentColor}
+.sc-app-topline.offline .dot{background:#ff667d}.sc-app-topline.syncing .dot{background:var(--sc-warning)}
+.sc-sidebar-tools{display:flex;gap:7px;margin-top:10px;align-items:center}
+.sc-mini-tool{
+  flex:1;min-height:38px;border:1px solid var(--line);border-radius:11px;background:#101827;color:#cbd4e3;
+  cursor:pointer;font-size:12px;font-weight:700;padding:8px 9px
+}
+.sc-mini-tool:hover{border-color:rgba(0,234,255,.35);background:#162235;transform:translateY(-1px)}
+.sc-mini-tool.active{border-color:rgba(0,234,255,.55);color:#fff;background:linear-gradient(135deg,rgba(0,234,255,.12),rgba(124,60,255,.13))}
+.sc-view-count{display:inline-flex;min-width:18px;height:18px;padding:0 5px;align-items:center;justify-content:center;border-radius:999px;background:rgba(0,234,255,.15);color:#73efff;font-size:10px;margin-left:4px}
+.sc-chat-meta{
+  display:flex;align-items:center;gap:6px;color:#7f8ca1;font-size:10px;margin-top:4px;min-width:0
+}
+.sc-encrypted-badge{display:inline-flex;align-items:center;gap:4px;color:#64e8b1}
+.sc-header-menu{position:relative;margin-left:0}
+.sc-menu{
+  position:absolute;right:0;top:45px;width:220px;padding:7px;border:1px solid var(--line);border-radius:14px;
+  background:rgba(13,20,33,.98);backdrop-filter:blur(20px);box-shadow:var(--sc-shadow);z-index:40
+}
+.sc-menu.hidden{display:none}
+.sc-menu button{
+  width:100%;display:flex;align-items:center;gap:9px;padding:10px 11px;border:0;border-radius:9px;
+  background:transparent;color:#dce5f2;text-align:left;cursor:pointer;font-size:12px
+}
+.sc-menu button:hover{background:#172238}
+.sc-menu hr{border:0;border-top:1px solid var(--line);margin:5px 0}
+.sc-chat-actions-row{display:flex;gap:6px;margin-left:auto}
+.sc-chat-action{
+  width:36px;height:36px;border:1px solid var(--line);border-radius:10px;background:#111927;color:#d7deeb;cursor:pointer
+}
+.sc-chat-action:hover{border-color:rgba(0,234,255,.35);transform:translateY(-1px)}
+.sc-chat-action.active{color:#ffd76a;border-color:rgba(255,215,106,.4);background:rgba(255,215,106,.08)}
+.sc-action-hidden{display:none!important}
+.sc-chat-settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.sc-chat-setting-btn{min-height:76px;padding:10px;border:1px solid var(--line);border-radius:13px;background:#101827;color:#dce5f2;text-align:left;cursor:pointer;display:grid;grid-template-columns:28px 1fr;grid-template-rows:auto auto;column-gap:7px;align-items:center}
+.sc-chat-setting-btn>span{grid-row:1 / span 2;font-size:19px;align-self:center;text-align:center}
+.sc-chat-setting-btn b{font-size:11px;align-self:end}
+.sc-chat-setting-btn small{font-size:9px;color:#7f8ca1;align-self:start;margin-top:3px}
+.sc-chat-setting-btn:hover{border-color:rgba(0,234,255,.38);transform:translateY(-1px);background:linear-gradient(135deg,rgba(0,234,255,.07),rgba(124,60,255,.07))}
+.sc-chat-setting-btn.wide{grid-column:1 / -1;min-height:55px}
+.theme-light .sc-chat-setting-btn{background:#fff;color:#142033}
+@media(max-width:600px){.sc-chat-settings-grid{grid-template-columns:1fr 1fr}.sc-chat-setting-btn{min-height:70px}}
+
+.sc-header-settings-note{padding:10px 11px;border:1px solid var(--line);border-radius:11px;background:rgba(0,234,255,.045);color:#8fa3bb;font-size:10px;line-height:1.45;margin-bottom:10px}
+.sc-action-setting{display:flex;align-items:center;gap:11px}
+.sc-action-setting .settings-icon{font-size:17px}
+.sc-action-setting .settings-item-text{flex:1}
+.sc-action-toggle{width:42px;height:24px;border:0;border-radius:999px;background:#263246;position:relative;cursor:pointer;flex-shrink:0;transition:.18s}
+.sc-action-toggle::after{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;border-radius:50%;background:#aab6c9;transition:.18s}
+.sc-action-toggle.on{background:linear-gradient(135deg,#00a9bd,#7137c9)}
+.sc-action-toggle.on::after{transform:translateX(18px);background:#fff}
+.theme-light .sc-header-settings-note{background:#f5f8fc;color:#607089}
+.theme-light .sc-action-toggle{background:#d6dde8}.theme-light .sc-action-toggle.on{background:#00a9bd}
+@media(max-width:600px){
+  .sc-chat-actions-row{gap:4px}
+  .sc-chat-action{width:34px;height:34px}
+}
+
+.sc-typing-dots{display:inline-flex;gap:3px;vertical-align:middle;margin-left:4px}
+.sc-typing-dots i{width:4px;height:4px;border-radius:50%;background:currentColor;animation:scDot 1.1s infinite ease-in-out}
+.sc-typing-dots i:nth-child(2){animation-delay:.15s}.sc-typing-dots i:nth-child(3){animation-delay:.3s}
+@keyframes scDot{0%,70%,100%{transform:translateY(0);opacity:.4}35%{transform:translateY(-3px);opacity:1}}
+.sc-message-highlight{outline:2px solid rgba(0,234,255,.65);box-shadow:0 0 0 7px rgba(0,234,255,.08)!important}
+.sc-message-new{animation:scMessageIn .28s ease both}
+@keyframes scMessageIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+.sc-reaction-strip{
+  display:flex;gap:3px;position:absolute;bottom:-15px;left:8px;z-index:5;
+  padding:3px 5px;border:1px solid var(--line);border-radius:999px;background:#0f1726;
+  box-shadow:0 8px 20px rgba(0,0,0,.25)
+}
+.sent .sc-reaction-strip{left:auto;right:8px}
+.sc-reaction{
+  border:0;background:transparent;color:#fff;cursor:pointer;font-size:12px;padding:1px 3px;border-radius:6px
+}
+.sc-reaction:hover{background:#1d2a3e;transform:scale(1.15)}
+.sc-reaction-summary{
+  display:inline-flex;align-items:center;gap:2px;margin-top:4px;padding:2px 6px;border-radius:999px;
+  border:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.14);font-size:10px;color:#dbe5f2
+}
+.sc-jump-bottom{
+  position:absolute;right:17px;bottom:78px;width:42px;height:42px;border-radius:50%;
+  border:1px solid rgba(0,234,255,.25);background:#111927;color:#fff;cursor:pointer;
+  box-shadow:0 10px 30px rgba(0,0,0,.3);z-index:12;opacity:0;transform:translateY(8px);pointer-events:none
+}
+.sc-jump-bottom.show{opacity:1;transform:none;pointer-events:auto}
+.sc-unread-pill{
+  position:absolute;right:14px;bottom:125px;padding:7px 10px;border-radius:999px;background:#00a9bd;color:#001218;
+  font-size:10px;font-weight:900;opacity:0;transform:translateY(8px);pointer-events:none;transition:.2s;z-index:12
+}
+.sc-unread-pill.show{opacity:1;transform:none}
+.sc-draft-note{font-size:9px;color:#6f7c91;margin-left:auto;display:none}
+.sc-draft-note.show{display:block}
+.sc-composer-wrap{position:relative}
+.sc-emoji-panel{
+  position:absolute;left:10px;bottom:62px;width:min(360px,calc(100vw - 20px));padding:10px;
+  border:1px solid var(--line);border-radius:16px;background:rgba(13,20,33,.98);box-shadow:var(--sc-shadow);
+  backdrop-filter:blur(20px);z-index:30
+}
+.sc-emoji-search{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:#080e18;color:#fff;outline:none;margin-bottom:8px}
+.sc-emoji-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:3px;max-height:210px;overflow:auto}
+.sc-emoji-grid button{border:0;background:transparent;color:#fff;border-radius:8px;padding:7px 3px;font-size:20px;cursor:pointer}
+.sc-emoji-grid button:hover{background:#172238;transform:scale(1.08)}
+.sc-quick-row{display:flex;gap:6px;overflow:auto;padding:5px 2px 1px}
+.sc-quick-row button{white-space:nowrap;border:1px solid var(--line);background:#111927;color:#cbd4e3;border-radius:999px;padding:6px 9px;font-size:10px;cursor:pointer}
+.sc-quick-row button:hover{border-color:rgba(0,234,255,.35);color:#fff}
+.sc-dropzone{
+  position:absolute;inset:0;border:2px dashed rgba(0,234,255,.7);background:rgba(0,234,255,.08);
+  display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;color:#8ff7ff;
+  opacity:0;pointer-events:none;z-index:25;transition:.2s
+}
+.sc-dropzone.show{opacity:1}
+.sc-command-backdrop,.sc-shortcuts-backdrop{
+  position:fixed;inset:0;background:rgba(0,0,0,.62);backdrop-filter:blur(8px);z-index:800;
+  display:flex;align-items:flex-start;justify-content:center;padding:10vh 16px
+}
+.sc-command,.sc-shortcuts{
+  width:min(680px,100%);border:1px solid var(--line);border-radius:20px;background:#0d1421;
+  box-shadow:0 35px 100px rgba(0,0,0,.6);overflow:hidden
+}
+.sc-command-input{width:100%;padding:18px 20px;border:0;border-bottom:1px solid var(--line);background:#0a101b;color:#fff;outline:none;font-size:17px}
+.sc-command-list{max-height:55vh;overflow:auto;padding:8px}
+.sc-command-item{
+  width:100%;display:flex;align-items:center;gap:12px;padding:12px;border:0;border-radius:11px;background:transparent;
+  color:#dce5f2;text-align:left;cursor:pointer
+}
+.sc-command-item:hover,.sc-command-item.selected{background:#172238}
+.sc-command-item b{font-size:13px}.sc-command-item small{display:block;color:#77869c;margin-top:2px}
+.sc-command-key{margin-left:auto;color:#6f7c91;border:1px solid var(--line);border-radius:6px;padding:2px 6px;font-size:9px}
+.sc-shortcuts{padding:18px}.sc-shortcuts h3{margin-bottom:12px}.sc-key-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:12px;color:#cbd4e3}
+.sc-key-row kbd{margin-left:auto;border:1px solid var(--line);background:#111927;border-radius:6px;padding:4px 7px;color:#fff}
+.sc-preference-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px}
+.sc-pref{
+  min-height:58px;padding:10px;border:1px solid var(--line);border-radius:12px;background:#101827;color:#dce5f2;
+  cursor:pointer;text-align:left
+}
+.sc-pref:hover{border-color:rgba(0,234,255,.3)}.sc-pref strong{display:block;font-size:12px}.sc-pref small{display:block;color:#7e8ba0;margin-top:4px;font-size:9px}
+.sc-range{width:100%;accent-color:var(--sc-accent)}
+.sc-toast-stack{position:fixed;right:18px;bottom:18px;z-index:1500;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.sc-smart-toast{padding:10px 13px;border:1px solid var(--line);border-radius:12px;background:#111927;color:#fff;box-shadow:var(--sc-shadow);font-size:12px;animation:scToastIn .25s ease}
+@keyframes scToastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.sc-pwa-banner{
+  position:fixed;left:50%;bottom:18px;transform:translateX(-50%) translateY(120px);z-index:900;
+  width:min(480px,calc(100vw - 24px));padding:13px;border:1px solid rgba(0,234,255,.2);border-radius:16px;
+  background:rgba(13,20,33,.96);box-shadow:var(--sc-shadow);display:flex;align-items:center;gap:10px;transition:.3s
+}
+.sc-pwa-banner.show{transform:translateX(-50%) translateY(0)}
+.sc-pwa-banner .copy{flex:1}.sc-pwa-banner strong{display:block;font-size:13px}.sc-pwa-banner small{display:block;color:#7f8ca1;font-size:10px;margin-top:3px}
+.sc-pwa-banner button{border:0;border-radius:9px;padding:8px 10px;background:#00eaff;color:#001218;font-weight:900;cursor:pointer}
+.sc-pwa-banner .close{background:#172033;color:#fff}
+.sc-light-panel{background:#fff!important;color:#142033!important}
+.theme-light .sc-menu,.theme-light .sc-emoji-panel,.theme-light .sc-command,.theme-light .sc-shortcuts,.theme-light .sc-pwa-banner{background:rgba(255,255,255,.98);color:#142033}
+.theme-light .sc-menu button,.theme-light .sc-command-item,.theme-light .sc-pref{color:#142033}
+.theme-light .sc-command-input,.theme-light .sc-emoji-search{background:#f5f7fb;color:#142033}
+.theme-light .sc-emoji-grid button{color:#142033}
+.theme-light .sc-shortcuts{color:#142033}.theme-light .sc-key-row{color:#334157}
+.theme-light .sc-app-topline,.theme-light .sc-smart-toast{background:rgba(255,255,255,.96);color:#142033}
+.sc-density-compact .user{padding-top:9px;padding-bottom:9px}.sc-density-compact .messages{gap:6px;padding-top:14px;padding-bottom:14px}
+.sc-density-compact .message{padding:6px 9px}.sc-density-comfortable .message{padding:10px 13px}.sc-density-comfortable .messages{gap:13px}
+.sc-font-large .message,.sc-font-large .message-input{font-size:15px!important}.sc-font-large .user-name{font-size:15px}
+.sc-hide-media .message img.media,.sc-hide-media .message audio{display:none!important}
+.sc-focus-mode .sidebar{width:0;overflow:hidden;border:0}.sc-focus-mode .chat-header{padding-left:24px}
+@media(max-width:800px){
+  .sc-sidebar-tools{overflow:auto}.sc-mini-tool{min-width:108px}
+  .sc-chat-action{width:34px;height:34px}.sc-chat-actions-row{gap:4px}
+  .sc-jump-bottom{right:12px;bottom:74px}.sc-unread-pill{right:10px;bottom:121px}
+  .sc-preference-grid{grid-template-columns:1fr}
+}
+@media(max-width:480px){
+  .sc-emoji-grid{grid-template-columns:repeat(7,1fr)}.sc-emoji-panel{left:6px}
+  .sc-chat-action.hide-mobile{display:none}.sc-command-backdrop,.sc-shortcuts-backdrop{padding:6vh 10px}
+}
+`;
+  document.head.appendChild(style);
+
+  /* ---------- utility ---------- */
+  function escText(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+  function toast(text){
+    const stack=document.querySelector(".sc-toast-stack")||(()=>{
+      const x=document.createElement("div");x.className="sc-toast-stack";document.body.appendChild(x);return x;
+    })();
+    const item=document.createElement("div");item.className="sc-smart-toast";item.textContent=text;stack.appendChild(item);
+    setTimeout(()=>item.remove(),3000);
+  }
+  function vibrate(pattern=[12]){
+    if(state.haptics!==false && navigator.vibrate) safe(()=>navigator.vibrate(pattern));
+  }
+  function isMobile(){return matchMedia("(max-width:800px)").matches}
+  function setHidden(el,hidden=true){if(el)el.classList.toggle("hidden",hidden)}
+
+  /* ---------- connection quality / online state ---------- */
+  const net=document.createElement("div");
+  net.className="sc-app-topline";
+  safeSetHTML(net, '<span class="dot"></span><span class="label">Connected</span>');
+  document.body.appendChild(net);
+  let netTimer=null;
+  function showNet(kind,label){
+    net.className="sc-app-topline "+kind+" show";
+    net.querySelector(".label").textContent=label;
+    clearTimeout(netTimer);
+    if(kind==="online")netTimer=setTimeout(()=>net.classList.remove("show"),2200);
+  }
+  window.addEventListener("online",()=>showNet("online","Connection restored"));
+  window.addEventListener("offline",()=>showNet("offline","You are offline — messages may wait"));
+  if(!navigator.onLine)showNet("offline","You are offline — messages may wait");
+
+  /* ---------- sidebar smart views ---------- */
+  const sidebarTop=document.querySelector(".sidebar-top");
+  if(sidebarTop && !document.querySelector(".sc-sidebar-tools")){
+    const tools=document.createElement("div");
+    tools.className="sc-sidebar-tools";
+    safeSetHTML(tools, `
+      <button class="sc-mini-tool active" data-view="all">All</button>
+      <button class="sc-mini-tool" data-view="friends">Friends</button>
+      <button class="sc-mini-tool" data-view="groups">Groups</button>
+      <button class="sc-mini-tool" data-view="requests">Requests<span class="sc-view-count" id="scReqCount">0</span></button>`);
+    sidebarTop.appendChild(tools);
+    state.view=state.view||"all";
+    function filterView(view){
+      state.view=view;saveState();
+      tools.querySelectorAll(".sc-mini-tool").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
+      if(typeof renderUsers!=="function")return;
+      let data=Array.isArray(allUsers)?allUsers:[];
+      if(view==="friends")data=data.filter(u=>u.isGroup||isFriend?.(u.id));
+      if(view==="groups")data=data.filter(u=>u.isGroup);
+      if(view==="requests")data=data.filter(u=>u.isGroup||getIncomingRequest?.(u.id)||getOutgoingRequest?.(u.id));
+      renderUsers(data);
+    }
+    tools.querySelectorAll("button").forEach(b=>b.onclick=()=>{vibrate();filterView(b.dataset.view)});
+    setTimeout(()=>filterView(state.view),300);
+    const refreshCount=()=>{const n=Array.isArray(incomingFriendRequests)?incomingFriendRequests.length:0;q("scReqCount").textContent=n};
+    setInterval(refreshCount,1200);
+  }
+
+  /* ---------- command palette ---------- */
+  const commandBackdrop=document.createElement("div");
+  commandBackdrop.className="sc-command-backdrop hidden";
+  safeSetHTML(commandBackdrop, `
+    <div class="sc-command" role="dialog" aria-label="ShaanChat command palette">
+      <input class="sc-command-input" placeholder="Search actions… (type a command)" autocomplete="off">
+      <div class="sc-command-list"></div>
+    </div>`);
+  document.body.appendChild(commandBackdrop);
+  const commandInput=commandBackdrop.querySelector(".sc-command-input");
+  const commandList=commandBackdrop.querySelector(".sc-command-list");
+  const commands=[
+    ["💬","Focus message box","Jump to the message composer","M"],
+    ["🔎","Search messages","Search messages in the current chat","S"],
+    ["😊","Open emoji picker","Insert an emoji","E"],
+    ["🌙","Toggle theme","Switch dark / light mode","T"],
+    ["⭐","Toggle favourite chat","Favourite the current chat","F"],
+    ["🎯","Focus mode","Hide the sidebar for distraction-free chat","O"],
+    ["⌨️","Keyboard shortcuts","Show all available shortcuts","?"],
+    ["⚙️","Open settings","Open ShaanChat settings","G"],
+    ["🔒","Lock current chat","Lock or unlock this conversation","L"],
+    ["📞","Voice call","Start a voice call","V"],
+    ["📹","Video call","Start a video call","C"]
+  ];
+  let commandIndex=0;
+  function openCommandPalette(){
+    commandBackdrop.classList.remove("hidden");commandInput.value="";commandIndex=0;renderCommands("");commandInput.focus();vibrate();
+  }
+  function closeCommandPalette(){commandBackdrop.classList.add("hidden")}
+  function runCommand(label){
+    closeCommandPalette();
+    if(label==="Focus message box"){q("messageInput")?.focus();return}
+    if(label==="Search messages"){q("searchMessagesBtn")?.click();return}
+    if(label==="Open emoji picker"){q("scEmojiBtn")?.click();return}
+    if(label==="Toggle theme"){q("themeBtn")?.click();return}
+    if(label==="Toggle favourite chat"){toggleFavourite();return}
+    if(label==="Focus mode"){toggleFocusMode();return}
+    if(label==="Keyboard shortcuts"){openShortcuts();return}
+    if(label==="Open settings"){q("settingsBtn")?.click();return}
+    if(label==="Lock current chat"){q("chatLockAction")?.click();return}
+    if(label==="Voice call"){q("voiceCallBtn")?.click();return}
+    if(label==="Video call"){q("videoCallBtn")?.click();return}
+  }
+  function renderCommands(term){
+    const t=term.toLowerCase().trim();
+    const arr=commands.filter(c=>(c[1]+" "+c[2]).toLowerCase().includes(t));
+    safeSetHTML(commandList, "");
+    arr.forEach((c,i)=>{
+      const b=document.createElement("button");b.className="sc-command-item"+(i===commandIndex?" selected":"");
+      safeSetHTML(b, `<span style="font-size:19px">${c[0]}</span><span><b>${escText(c[1])}</b><small>${escText(c[2])}</small></span><span class="sc-command-key">Ctrl ${c[3]}</span>`);
+      b.onclick=()=>runCommand(c[1]);commandList.appendChild(b);
+    });
+  }
+  commandInput.oninput=()=>{commandIndex=0;renderCommands(commandInput.value)};
+  commandInput.onkeydown=e=>{
+    const items=[...commandList.querySelectorAll(".sc-command-item")];
+    if(e.key==="ArrowDown"){e.preventDefault();commandIndex=Math.min(commandIndex+1,items.length-1);renderCommands(commandInput.value)}
+    if(e.key==="ArrowUp"){e.preventDefault();commandIndex=Math.max(commandIndex-1,0);renderCommands(commandInput.value)}
+    if(e.key==="Enter"){e.preventDefault();items[commandIndex]?.click()}
+    if(e.key==="Escape")closeCommandPalette();
+  };
+  commandBackdrop.onclick=e=>{if(e.target===commandBackdrop)closeCommandPalette()};
+
+  /* ---------- keyboard shortcuts ---------- */
+  const shortcutBackdrop=document.createElement("div");
+  shortcutBackdrop.className="sc-shortcuts-backdrop hidden";
+  safeSetHTML(shortcutBackdrop, `
+    <div class="sc-shortcuts">
+      <h3>⌨️ ShaanChat shortcuts</h3>
+      <div class="sc-key-row"><span>Command palette</span><kbd>Ctrl / ⌘ + K</kbd></div>
+      <div class="sc-key-row"><span>Focus composer</span><kbd>M</kbd></div>
+      <div class="sc-key-row"><span>Search current chat</span><kbd>Ctrl / ⌘ + F</kbd></div>
+      <div class="sc-key-row"><span>Message reactions</span><kbd>Long press</kbd></div>
+      <div class="sc-key-row"><span>Toggle theme</span><kbd>T</kbd></div>
+      <div class="sc-key-row"><span>Focus mode</span><kbd>O</kbd></div>
+      <div class="sc-key-row"><span>Send message</span><kbd>Enter</kbd></div>
+      <div class="sc-key-row"><span>New line</span><kbd>Shift + Enter</kbd></div>
+      <div style="display:flex);justify-content:flex-end;margin-top:14px"><button class="small-btn" id="scCloseShortcuts">Close</button></div>
+    </div>`;
+  document.body.appendChild(shortcutBackdrop);
+  function openShortcuts(){shortcutBackdrop.classList.remove("hidden")}
+  shortcutBackdrop.onclick=e=>{if(e.target===shortcutBackdrop)shortcutBackdrop.classList.add("hidden")};
+  shortcutBackdrop.querySelector("#scCloseShortcuts").onclick=()=>shortcutBackdrop.classList.add("hidden");
+
+  /* ---------- emoji composer removed; reactions are long-press only ---------- */
+  const emojiPanel=document.createElement("div");
+  emojiPanel.className="sc-emoji-panel hidden";
+  emojiPanel.setAttribute("aria-hidden","true");
+  document.body.appendChild(emojiPanel);
+  const emojiSearch=document.createElement("input");
+  emojiSearch.type="text";
+  emojiSearch.style.display="none";
+  const emojiCatalog=["❤️","😂","👍","😮","😢","🔥","😍","👏","🙏","🎉","💯","😡"];
+  function renderEmojiGrid(){}
+
+  /* ---------- drag & drop uploads ---------- */
+  const dropzone=document.createElement("div");dropzone.className="sc-dropzone";dropzone.textContent="Drop files here to upload";
+  const chatEl=document.querySelector(".chat");if(chatEl){chatEl.style.position="relative";chatEl.appendChild(dropzone)}
+  let dragDepth=0;
+  chatEl?.addEventListener("dragenter",e=>{e.preventDefault();dragDepth++;dropzone.classList.add("show")});
+  chatEl?.addEventListener("dragover",e=>e.preventDefault());
+  chatEl?.addEventListener("dragleave",e=>{e.preventDefault();dragDepth--;if(dragDepth<=0){dragDepth=0;dropzone.classList.remove("show")}});
+  chatEl?.addEventListener("drop",async e=>{
+    e.preventDefault();dragDepth=0;dropzone.classList.remove("show");
+    const files=[...e.dataTransfer.files];
+    if(!selectedChat){toast("Select a chat first");return}
+    for(const file of files){if(typeof uploadAttachment==="function")await uploadAttachment(file)}
+  });
+
+  /* ---------- draft system ---------- */
+  const draftKey=()=>`sc-draft:${currentUser?.uid||"guest"}:${selectedChat?.id||"none"}`;
+  const draftNote=document.createElement("span");draftNote.className="sc-draft-note";draftNote.textContent="Draft saved";
+  q("messageInput")?.parentElement?.appendChild(draftNote);
+  let draftTimer=null;
+  function loadDraft(){
+    const input=q("messageInput");if(!input)return;
+    const val=localStorage.getItem(draftKey())||"";
+    input.value=val;draftNote.classList.toggle("show",!!val);
+  }
+  function saveDraft(){
+    const input=q("messageInput");if(!input||!selectedChat)return;
+    clearTimeout(draftTimer);
+    draftTimer=setTimeout(()=>{
+      const val=input.value;
+      if(val) {localStorage.setItem(draftKey(),val);draftNote.classList.add("show")}
+      else {localStorage.removeItem(draftKey());draftNote.classList.remove("show")}
+    },350);
+  }
+  const input=q("messageInput");
+  input?.addEventListener("input",saveDraft);
+  window.addEventListener("beforeunload",saveDraft);
+
+  /* Wrap sendMessage to clear draft after successful calls where possible. */
+  const originalSend=sendMessage;
+  if(typeof originalSend==="function"){
+    sendMessage=async function(...args){
+      const before=input?.value||"";
+      const result=await originalSend.apply(this,args);
+      if(input && (!input.value || input.value!==before)){
+        localStorage.removeItem(draftKey());draftNote.classList.remove("show");
+      }
+      return result;
+    };
+  }
+
+
+  /* ---------- chat-open bridge for drafts + favourites ---------- */
+  const originalOpenChat=openChat;
+  openChat=async function(user,element){
+    try{
+      const oldChatId=selectedChat?.id;
+      if(oldChatId && input?.value) localStorage.setItem(`sc-draft:${currentUser?.uid||"guest"}:${oldChatId}`,input.value);
+    }catch(_){}
+    await originalOpenChat(user,element);
+    setTimeout(()=>{
+      loadDraft();
+      window.scRefreshFavourite?.();
+      if(input){input.focus();input.setSelectionRange(input.value.length,input.value.length)}
+    },60);
+  };
+
+  /* ---------- jump-to-bottom + unread UX ---------- */
+  const jump=document.createElement("button");jump.className="sc-jump-bottom";jump.textContent="↓";jump.title="Jump to latest message";jump.setAttribute("aria-label","Jump to latest message");
+  const unread=document.createElement("div");unread.className="sc-unread-pill";unread.textContent="New messages";
+  if(chatEl){chatEl.append(jump,unread)}
+  let nearBottom=true;
+  function updateJump(){
+    const m=q("messages");if(!m)return;
+    nearBottom=m.scrollHeight-m.scrollTop-m.clientHeight<90;
+    jump.classList.toggle("show",!nearBottom && m.scrollHeight>m.clientHeight+120);
+  }
+  q("messages")?.addEventListener("scroll",updateJump,{passive:true});
+  jump.onclick=()=>{q("messages").scrollTo({top:q("messages").scrollHeight,behavior:"smooth"});unread.classList.remove("show");vibrate([8])};
+
+  /* ---------- long-press message reactions ---------- */
+  const originalRender=renderMessage;
+  const reactionEmojis=["❤️","😂","👍","😮","😢","🔥"];
+  const localReactions=()=>JSON.parse(localStorage.getItem("sc-reactions")||"{}");
+  const saveReactions=x=>localStorage.setItem("sc-reactions",JSON.stringify(x));
+
+  function closeAllReactionMenus(){
+    document.querySelectorAll(".sc-reaction-strip.longpress-open").forEach(x=>x.classList.remove("longpress-open"));
+  }
+
+  function renderReactionSummary(wrap,d){
+    if(!wrap)return;
+    wrap.querySelector(".sc-reaction-summary")?.remove();
+    const key=`${selectedChat?.id||"chat"}:${d.id}`;
+    const r=localReactions()[key];
+    if(!r)return;
+    const s=document.createElement("div");
+    s.className="sc-reaction-summary";
+    s.textContent=r+" You";
+    wrap.appendChild(s);
+  }
+
+  function addReactionUI(wrap,d){
+    if(!wrap||wrap.querySelector(".sc-reaction-strip"))return;
+
+    const strip=document.createElement("div");
+    strip.className="sc-reaction-strip";
+    reactionEmojis.forEach(em=>{
+      const b=document.createElement("button");
+      b.className="sc-reaction";
+      b.textContent=em;
+      b.title="React "+em;
+      b.type="button";
+      b.onclick=e=>{
+        e.stopPropagation();
+        const all=localReactions();
+        const key=`${selectedChat?.id||"chat"}:${d.id}`;
+        all[key]=all[key]===em?"":em;
+        saveReactions(all);
+        renderReactionSummary(wrap,d);
+        strip.classList.remove("longpress-open");
+        vibrate([10]);
+      };
+      strip.appendChild(b);
+    });
+    wrap.appendChild(strip);
+
+    let pressTimer=null;
+    let longPressed=false;
+
+    const openReactions=e=>{
+      if(e) e.preventDefault();
+      longPressed=true;
+      closeAllReactionMenus();
+      strip.classList.add("longpress-open");
+      wrap.classList.add("sc-message-longpress");
+      setTimeout(()=>wrap.classList.remove("sc-message-longpress"),220);
+      vibrate([12]);
+    };
+
+    wrap.addEventListener("contextmenu",e=>{
+      e.preventDefault();
+      openReactions(e);
+    });
+
+    wrap.addEventListener("touchstart",e=>{
+      longPressed=false;
+      clearTimeout(pressTimer);
+      pressTimer=setTimeout(()=>openReactions(e),520);
+    },{passive:true});
+
+    ["touchend","touchcancel","touchmove"].forEach(type=>{
+      wrap.addEventListener(type,()=>{
+        if(type!=="touchmove" && !longPressed)clearTimeout(pressTimer);
+        if(type==="touchmove")clearTimeout(pressTimer);
+      },{passive:true});
+    });
+
+    wrap.addEventListener("mousedown",e=>{
+      if(e.button!==0)return;
+      pressTimer=setTimeout(()=>openReactions(e),600);
+    });
+    wrap.addEventListener("mouseup",()=>{
+      clearTimeout(pressTimer);
+    });
+    wrap.addEventListener("mouseleave",()=>{
+      clearTimeout(pressTimer);
+    });
+
+    renderReactionSummary(wrap,d);
+  }
+
+  if(typeof originalRender==="function"){
+    renderMessage=function(d){
+      const result=originalRender.call(this,d);
+      const m=q("messages");
+      const wrap=m?.lastElementChild;
+      if(wrap && wrap.classList.contains("message-wrap") && wrap.dataset.id===d.id){
+        wrap.classList.add("sc-message-new");
+        addReactionUI(wrap,d);
+        if(!nearBottom && d.senderId!==currentUser?.uid)unread.classList.add("show");
+      }
+      return result;
+    };
+  }
+
+  document.addEventListener("click",e=>{
+    if(!e.target.closest(".message-wrap"))closeAllReactionMenus();
+    else if(!e.target.closest(".sc-reaction")) {
+      const open=e.target.closest(".message-wrap")?.querySelector(".sc-reaction-strip.longpress-open");
+      if(open && !e.target.closest(".sc-reaction-strip"))open.classList.remove("longpress-open");
+    }
+  });
+
+  /* ---------- header action bar ---------- */
+  const header=document.querySelector(".chat-header");
+  const tools=document.querySelector(".chat-tools");
+  if(header && tools && !document.querySelector(".sc-chat-actions-row")){
+    const row=document.createElement("div");row.className="sc-chat-actions-row";
+    const fav=document.createElement("button");fav.className="sc-chat-action";fav.title="Favourite chat";fav.textContent="⭐";
+    const menuWrap=document.createElement("div");menuWrap.className="sc-header-menu";
+    const menuBtn=document.createElement("button");menuBtn.className="sc-chat-action";menuBtn.textContent="⋮";menuBtn.title="More chat actions";
+    const menu=document.createElement("div");menu.className="sc-menu hidden";
+    safeSetHTML(menu, `
+      <button data-action="focus">🎯 <span>Focus mode</span></button>
+      <button data-action="clearDraft">🧹 <span>Clear draft</span></button>
+      <button data-action="copyId">🆔 <span>Copy chat ID</span></button>
+      <button data-action="shortcuts">⌨️ <span>Keyboard shortcuts</span></button>
+      <hr>
+      <button data-action="export">📤 <span>Export visible messages</span></button>`);
+    menuWrap.append(menuBtn,menu);row.append(fav,menuWrap);
+    tools.prepend(row);
+    function favKey(){return selectedChat?.id||selectedUser?.id||"none"}
+    function isFav(){return Array.isArray(state.favourites)&&state.favourites.includes(favKey())}
+    function refreshFav(){fav.classList.toggle("active",isFav());fav.title=isFav()?"Remove favourite":"Favourite chat"}
+    function toggleFavourite(){
+      const key=favKey();if(key==="none")return toast("Select a chat first");
+      state.favourites=Array.isArray(state.favourites)?state.favourites:[];
+      const i=state.favourites.indexOf(key);
+      if(i>=0){state.favourites.splice(i,1);toast("Removed from favourites")}
+      else{state.favourites.push(key);toast("Chat added to favourites")}
+      saveState();refreshFav();
+    }
+    window.toggleFavourite=toggleFavourite;
+    fav.onclick=()=>{toggleFavourite();vibrate()};
+    menuBtn.onclick=e=>{e.stopPropagation();menu.classList.toggle("hidden")};
+    document.addEventListener("click",e=>{if(!menuWrap.contains(e.target))menu.classList.add("hidden")});
+    menu.onclick=async e=>{
+      const b=e.target.closest("[data-action]");if(!b)return;
+      menu.classList.add("hidden");const action=b.dataset.action;
+      if(action==="focus")toggleFocusMode();
+      if(action==="clearDraft"){if(selectedChat)localStorage.removeItem(draftKey());if(input){input.value="";draftNote.classList.remove("show")}toast("Draft cleared")}
+      if(action==="copyId"){const id=selectedChat?.id;if(!id)return toast("Select a chat first");navigator.clipboard?.writeText(id).then(()=>toast("Chat ID copied")).catch(()=>toast("Clipboard unavailable"))}
+      if(action==="shortcuts")openShortcuts();
+      if(action==="export")exportVisibleMessages();
+    };
+    window.scRefreshFavourite=refreshFav;
+    refreshFav();
+  }
+
+  /* ---------- configurable chat header actions ---------- */
+  const headerActionDefaults={
+    favourite:true, more:true, search:true, voice:true, video:true, security:true, private:true
+  };
+  state.headerActions=Object.assign({},headerActionDefaults,state.headerActions||{});
+
+  function headerActionEnabled(key){
+    return state.headerActions?.[key]!==false;
+  }
+
+  function applyHeaderActionVisibility(){
+    const row=document.querySelector(".sc-chat-actions-row");
+    const fav=row?.querySelector(".sc-chat-action");
+    const menuWrap=row?.querySelector(".sc-header-menu");
+    if(fav)fav.classList.toggle("sc-action-hidden",!headerActionEnabled("favourite"));
+    if(menuWrap)menuWrap.classList.toggle("sc-action-hidden",!headerActionEnabled("more"));
+
+    const map={
+      search:"searchMessagesBtn",
+      voice:"voiceCallBtn",
+      video:"videoCallBtn",
+      security:"chatSecurityBtn",
+      private:"privateChatBtn"
+    };
+    Object.entries(map).forEach(([key,id])=>{
+      const el=q(id);
+      if(el)el.classList.toggle("sc-action-hidden",!headerActionEnabled(key));
+    });
+  }
+
+  function saveHeaderActionPrefs(){
+    saveState();
+    applyHeaderActionVisibility();
+    toast("Chat header settings saved");
+  }
+
+  function openHeaderActions(){
+    const modal=q("scHeaderActionsModal");
+    if(!modal)return;
+    modal.querySelectorAll("[data-header-action]").forEach(item=>{
+      const key=item.dataset.headerAction;
+      const toggle=item.querySelector(".sc-action-toggle");
+      const on=headerActionEnabled(key);
+      toggle?.classList.toggle("on",on);
+      toggle?.setAttribute("aria-pressed",String(on));
+    });
+    modal.classList.remove("hidden");
+  }
+
+  function resetHeaderActions(){
+    state.headerActions=Object.assign({},headerActionDefaults);
+    saveState();
+    openHeaderActions();
+    applyHeaderActionVisibility();
+  }
+
+  q("scHeaderActionsBtn")?.addEventListener("click",()=>{
+    q("settingsModal")?.classList.add("hidden");
+    openHeaderActions();
+  });
+  q("scCloseHeaderActions")?.addEventListener("click",()=>q("scHeaderActionsModal")?.classList.add("hidden"));
+  q("scDoneHeaderActions")?.addEventListener("click",()=>q("scHeaderActionsModal")?.classList.add("hidden"));
+  q("scResetHeaderActions")?.addEventListener("click",resetHeaderActions);
+
+  q("scHeaderActionsModal")?.querySelectorAll("[data-header-action]").forEach(item=>{
+    const toggle=item.querySelector(".sc-action-toggle");
+    toggle?.addEventListener("click",e=>{
+      e.stopPropagation();
+      const key=item.dataset.headerAction;
+      state.headerActions[key]=!headerActionEnabled(key);
+      toggle.classList.toggle("on",state.headerActions[key]);
+      toggle.setAttribute("aria-pressed",String(state.headerActions[key]));
+      saveHeaderActionPrefs();
+    });
+  });
+
+  q("scHeaderActionsModal")?.addEventListener("click",e=>{
+    if(e.target===q("scHeaderActionsModal"))q("scHeaderActionsModal").classList.add("hidden");
+  });
+
+  applyHeaderActionVisibility();
+  restoreChatHeaderControls();
+
+  /* ---------- REAL CHAT ACTIONS INSIDE MAIN SETTINGS ---------- */
+  function requireChat(action){
+    if(!selectedChat && !selectedUser){toast("Select a chat first");return false}
+    return true
+  }
+  function closeMainSettings(){q("settingsModal")?.classList.add("hidden")}
+  q("scSettingFavourite")?.addEventListener("click",()=>{if(!requireChat())return;toggleFavourite();});
+  q("scSettingSearch")?.addEventListener("click",()=>{if(!requireChat())return;closeMainSettings();q("searchMessagesBtn")?.click()});
+  q("scSettingVoice")?.addEventListener("click",()=>{if(!requireChat())return;closeMainSettings();q("voiceCallBtn")?.click()});
+  q("scSettingVideo")?.addEventListener("click",()=>{if(!requireChat())return;closeMainSettings();q("videoCallBtn")?.click()});
+  q("scSettingSecurity")?.addEventListener("click",()=>{if(!requireChat())return;closeMainSettings();q("chatSecurityBtn")?.click()});
+  q("scSettingPrivate")?.addEventListener("click",()=>{if(!requireChat())return;closeMainSettings();q("privateChatBtn")?.click()});
+  q("scSettingGroup")?.addEventListener("click",()=>{if(!requireChat())return;closeMainSettings();q("groupSettingsBtn")?.click()});
+  q("scSettingBlock")?.addEventListener("click",()=>{if(!requireChat())return;closeMainSettings();q("blockUserBtn")?.click()});
+  q("scSettingFocus")?.addEventListener("click",()=>{if(!requireChat())return;toggleFocusMode()});
+  q("scSettingClearDraft")?.addEventListener("click",()=>{if(!requireChat())return;localStorage.removeItem(draftKey());if(input){input.value=""}if(draftNote)draftNote.classList.remove("show");toast("Draft cleared")});
+  q("scSettingExport")?.addEventListener("click",()=>{if(!requireChat())return;exportVisibleMessages()});
+
+  function refreshChatSettingsAvailability(){
+    const person=!!selectedUser&&!selectedUser.isGroup;
+    const group=!!selectedUser?.isGroup;
+    [["scSettingVoice",person],["scSettingVideo",person],["scSettingPrivate",person],["scSettingSecurity",person],["scSettingBlock",person],["scSettingGroup",group]].forEach(([id,on])=>{const el=q(id);if(el){el.disabled=!on;el.style.opacity=on?"1":".42";el.style.pointerEvents=on?"auto":"none"}});
+  }
+  refreshChatSettingsAvailability();
+  const _refreshHeaderChatSettings=window.scRefreshFavourite;
+  window.scRefreshChatSettings=refreshChatSettingsAvailability;
+
+  function restoreChatHeaderControls(){
+    const person=!!selectedUser&&!selectedUser.isGroup;
+    const group=!!selectedUser?.isGroup;
+    const controls=[
+      ["voiceCallBtn",person,"voice"],
+      ["videoCallBtn",person,"video"],
+      ["chatSecurityBtn",person,"security"],
+      ["privateChatBtn",person,"private"],
+      ["groupSettingsBtn",group,null]
+    ];
+    controls.forEach(([id,available,pref])=>{
+      const el=q(id);
+      if(!el)return;
+      el.classList.toggle("hidden",!available);
+      if(pref)el.classList.toggle("sc-action-hidden",!headerActionEnabled(pref));
+    });
+    const search=q("searchMessagesBtn");
+    if(search)search.classList.toggle("sc-action-hidden",!headerActionEnabled("search"));
+    refreshChatSettingsAvailability();
+  }
+  window.scRestoreChatHeaderControls=restoreChatHeaderControls;
+
+  function toggleFocusMode(){
+    state.focus=!state.focus;saveState();body.classList.toggle("sc-focus-mode",!!state.focus);toast(state.focus?"Focus mode on":"Focus mode off");
+  }
+  window.toggleFocusMode=toggleFocusMode;
+  if(state.focus)body.classList.add("sc-focus-mode");
+
+  /* ---------- settings enhancements ---------- */
+  const settingsList=document.querySelector("#settingsModal .settings-list");
+  if(settingsList && !q("scAppearanceBtn")){
+    const divider=document.createElement("div");divider.className="settings-divider";settingsList.insertBefore(divider,settingsList.querySelector(".settings-logout"));
+    const btn=document.createElement("button");btn.id="scAppearanceBtn";btn.className="settings-item";
+    safeSetHTML(btn, '<span class="settings-icon">🎨</span><span class="settings-item-text"><strong>Chat Appearance</strong><small>Font size, density, media and motion preferences</small></span><span class="settings-arrow">›</span>');
+    settingsList.insertBefore(btn,divider.nextSibling);
+    btn.onclick=()=>openAppearance();
+  }
+  const appearance=document.createElement("div");appearance.className="modal hidden";appearance.id="scAppearanceModal";
+  safeSetHTML(appearance, `
+    <div class="modal-card settings-card">
+      <div class="settings-head"><div><div class="modal-title" style="margin-bottom:4px">🎨 Chat Appearance</div><div class="settings-subtitle">Personalize the ShaanChat interface on this device</div></div><button class="settings-close" id="scCloseAppearance">✕</button></div>
+      <div class="sc-preference-grid">
+        <button class="sc-pref" data-pref="density"><strong>📐 Message density</strong><small id="scDensityLabel">Balanced</small></button>
+        <button class="sc-pref" data-pref="font"><strong>🔤 Text size</strong><small id="scFontLabel">Standard</small></button>
+        <button class="sc-pref" data-pref="motion"><strong>✨ Motion</strong><small id="scMotionLabel">Animations enabled</small></button>
+        <button class="sc-pref" data-pref="media"><strong>🖼️ Media previews</strong><small id="scMediaLabel">Shown</small></button>
+      </div>
+      <div class="permission-list">
+        <div style="font-size:12px);font-weight:800;margin-bottom:7px">Accent intensity</div>
+        <input class="sc-range" id="scAccentRange" type="range" min="0" max="100" value="${Number(state.accent||100)}">
+        <div style="display:flex;justify-content:space-between;color:#8490a5;font-size:10px;margin-top:5px"><span>Subtle</span><span>Vivid</span></div>
+      </div>
+      <div class="modal-actions"><button class="small-btn" id="scResetAppearance">Reset</button><button class="small-btn" id="scCloseAppearance2">Done</button></div>
+    </div>`;
+  document.body.appendChild(appearance);
+  function applyAppearance(){
+    body.classList.remove("sc-density-compact","sc-density-comfortable","sc-font-large","sc-reduced-motion","sc-hide-media");
+    const density=state.density||"balanced";if(density!=="balanced")body.classList.add("sc-density-"+density);
+    if(state.font==="large")body.classList.add("sc-font-large");
+    if(state.motion==="reduced")body.classList.add("sc-reduced-motion");
+    if(state.media==="hide")body.classList.add("sc-hide-media");
+    const accent=Math.max(0,Math.min(100,Number(state.accent??100)));
+    root.style.setProperty("--sc-accent",`rgba(0,234,255,${.15+.85*accent/100})`);
+    const dl=q("scDensityLabel"),fl=q("scFontLabel"),ml=q("scMotionLabel"),med=q("scMediaLabel");
+    if(dl)dl.textContent=density==="compact"?"Compact":density==="comfortable"?"Comfortable":"Balanced";
+    if(fl)fl.textContent=state.font==="large"?"Large":"Standard";
+    if(ml)ml.textContent=state.motion==="reduced"?"Reduced motion":"Animations enabled";
+    if(med)med.textContent=state.media==="hide"?"Hidden":"Shown";
+  }
+  function openAppearance(){applyAppearance();appearance.classList.remove("hidden")}
+  q("scCloseAppearance")?.addEventListener("click",()=>appearance.classList.add("hidden"));
+  q("scCloseAppearance2")?.addEventListener("click",()=>appearance.classList.add("hidden"));
+  q("scResetAppearance")?.addEventListener("click",()=>{
+    delete state.density;delete state.font;delete state.motion;delete state.media;state.accent=100;saveState();applyAppearance();toast("Appearance reset")
+  });
+  appearance.querySelectorAll("[data-pref]").forEach(b=>b.onclick=()=>{
+    const k=b.dataset.pref;
+    if(k==="density")state.density=state.density==="compact"?"balanced":state.density==="balanced"?"comfortable":"compact";
+    if(k==="font")state.font=state.font==="large"?"standard":"large";
+    if(k==="motion")state.motion=state.motion==="reduced"?"full":"reduced";
+    if(k==="media")state.media=state.media==="hide"?"show":"hide";
+    saveState();applyAppearance();vibrate([8]);
+  });
+  q("scAccentRange").oninput=e=>{state.accent=e.target.value;saveState();applyAppearance()};
+  applyAppearance();
+
+  /* ---------- export visible messages ---------- */
+  function exportVisibleMessages(){
+    if(!Array.isArray(loadedMessages)||!selectedChat)return toast("No loaded messages to export");
+    const rows=loadedMessages.filter(d=>!d.deletedFor?.[currentUser?.uid]).map(d=>{
+      const date=d.createdAt?.toDate?d.createdAt.toDate().toISOString():"";
+      return `[${date}] ${d.senderName||"User"}: ${d.text||d.fileName||"Attachment"}`;
+    });
+    const content=`ShaanChat export\nChat: ${selectedUser?.name||selectedChat.id}\nExported: ${new Date().toISOString()}\n\n${rows.join("\n")}`;
+    const blob=new Blob([content],{type:"text/plain;charset=utf-8"}),url=URL.createObjectURL(blob);
+    const a=document.createElement("a");a.href=url;a.download=`shaanchat-${Date.now()}.txt`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    toast("Messages exported");vibrate([12]);
+  }
+  window.exportVisibleMessages=exportVisibleMessages;
+
+  /* ---------- profile / privacy micro UX ---------- */
+  const profileModal=q("profileModal");
+  if(profileModal){
+    const title=profileModal.querySelector(".modal-title");
+    if(title)safeSetHTML(title, "👤 Your profile <span style='font-size:10px);color:#48e6a1;margin-left:5px'>● synced</span>";
+  }
+
+  /* ---------- typing indicator upgrade ---------- */
+  const typing=q("typingIndicator");
+  if(typing){
+    const observer=new MutationObserver(()=>{
+      if(typing.textContent.trim()){
+        safeSetHTML(typing, 'typing <span class="sc-typing-dots"><i></i><i></i><i></i></span>');
+      }
+    });
+    observer.observe(typing,{childList:true,characterData:true,subtree:true});
+  }
+
+  /* ---------- accessibility helpers ---------- */
+  document.querySelectorAll("button").forEach(b=>{
+    if(!b.getAttribute("aria-label") && !b.title && !b.textContent.trim())b.setAttribute("aria-label","Button");
+  });
+  document.addEventListener("keydown",e=>{
+    const tag=(e.target?.tagName||"").toLowerCase();
+    const typingField=["input","textarea"].includes(tag);
+    const mod=e.ctrlKey||e.metaKey;
+    if(mod&&e.key.toLowerCase()==="k"){e.preventDefault();openCommandPalette();return}
+    if(mod&&e.key.toLowerCase()==="f" && q("app")?.classList.contains("show")){
+      e.preventDefault();q("searchMessagesBtn")?.click();return
+    }
+    if(e.key==="Escape"){
+      if(!commandBackdrop.classList.contains("hidden"))closeCommandPalette();
+      else if(!shortcutBackdrop.classList.contains("hidden"))shortcutBackdrop.classList.add("hidden");
+      return;
+    }
+    if(typingField||mod||e.altKey)return;
+    if(e.key.toLowerCase()==="m"){q("messageInput")?.focus();return}
+    if(e.key.toLowerCase()==="t"){q("themeBtn")?.click();return}
+    if(e.key.toLowerCase()==="o"){toggleFocusMode();return}
+    if(e.key==="?"){openShortcuts();return}
+  });
+
+  /* ---------- theme persistence cleanup ---------- */
+  const themeButton=q("themeBtn");
+  if(themeButton){
+    const old=themeButton.onclick;
+    themeButton.addEventListener("click",()=>{state.theme=document.documentElement.classList.contains("theme-light")?"light":"dark";saveState()});
+  }
+
+  /* ---------- PWA install prompt ---------- */
+  let deferredInstall=null;
+  const installBanner=document.createElement("div");installBanner.className="sc-pwa-banner";
+  safeSetHTML(installBanner, '<div class="copy"><strong>📲 Install ShaanChat</strong><small>Add ShaanChat to your home screen for a faster app-like experience.</small></div><button id="scInstall">Install</button><button class="close" id="scDismissInstall">✕</button>');
+  document.body.appendChild(installBanner);
+  window.addEventListener("beforeinstallprompt",e=>{
+    e.preventDefault();deferredInstall=e;
+    if(localStorage.getItem("sc-install-dismissed")!=="1")setTimeout(()=>installBanner.classList.add("show"),1800);
+  });
+  q("scInstall").onclick=async()=>{
+    if(!deferredInstall)return;
+    deferredInstall.prompt();await deferredInstall.userChoice.catch(()=>{});deferredInstall=null;installBanner.classList.remove("show");
+  };
+  q("scDismissInstall").onclick=()=>{localStorage.setItem("sc-install-dismissed","1");installBanner.classList.remove("show")};
+
+  /* ---------- service worker update notification ---------- */
+  if("serviceWorker" in navigator){
+    navigator.serviceWorker.addEventListener("controllerchange",()=>{
+      toast("ShaanChat updated — reload for the latest version");
+    });
+  }
+
+  /* ---------- startup polish ---------- */
+  window.addEventListener("load",()=>{
+    applyHeaderActionVisibility();
+    setTimeout(()=>{
+      if(q("authScreen")?.style.display!=="none"){
+        q("email")?.setAttribute("autocomplete","email");
+        q("password")?.setAttribute("autocomplete","current-password");
+      }
+    },200);
+    const input=q("messageInput");
+    input?.setAttribute("enterkeyhint","send");
+    input?.setAttribute("spellcheck","true");
+  });
+
+  /* ---------- lightweight performance guard ---------- */
+  let lastTitle="";
+  setInterval(()=>{
+    const unreadCount=document.querySelectorAll(".sc-unread-pill.show").length;
+    const title=(document.hidden?"ShaanChat":"ShaanChat Pro");
+    if(title!==lastTitle){document.title=title;lastTitle=title}
+  },2500);
+
+  /* expose small helpers for future upgrades */
+  window.ShaanChatUX={
+    version:"2026.08 Pro UX • Cloudinary v2",
+    state,
+    saveState,
+    toast,
+    openCommandPalette,
+    openShortcuts,
+    toggleFocusMode,
+    exportVisibleMessages
+  };
+})();
+
+
+/* ===== SHAANCHAT PRIVATE CHAT MODE ===== */
+const privateChatBtn=$('privateChatBtn');
+const privateChatModal=$('privateChatModal');
+const privateModeToggle=$('privateModeToggle');
+const privatePreviewToggle=$('privatePreviewToggle');
+const privateDisappearSelect=$('privateDisappearSelect');
+const privateMediaToggle=$('privateMediaToggle');
+const privateChatStatus=$('privateChatStatus');
+const privateChatStatusSub=$('privateChatStatusSub');
+const privateChatBadge=$('privateChatBadge');
+
+function privateKey(chatId){return `shaanchat.private.${currentUser?.uid||'guest'}.${chatId||'none'}`}
+function getPrivateSettings(chatId){
+  try{return JSON.parse(localStorage.getItem(privateKey(chatId))||'{}')}catch(_){return {}}
+}
+function savePrivateSettingsLocal(chatId,data){localStorage.setItem(privateKey(chatId),JSON.stringify({...data,updatedAt:Date.now()}))}
+function currentPrivateSettings(){return selectedChat?getPrivateSettings(selectedChat.id):{}}
+function updatePrivateHeader(){
+  if(!privateChatBtn)return;
+  const enabled=!!currentPrivateSettings().enabled;
+  privateChatBtn.classList.toggle('show',!!selectedUser&&!selectedUser.isGroup && headerActionEnabled('private'));
+  privateChatBtn.classList.toggle('active',enabled);
+  privateChatBtn.title=enabled?'Private chat enabled':'Private chat';
+}
+function fillPrivateChatSettings(){
+  if(!selectedChat)return;
+  const d=currentPrivateSettings();
+  privateModeToggle.checked=!!d.enabled;
+  privatePreviewToggle.checked=d.hidePreview!==false;
+  privateDisappearSelect.value=String(d.disappear||0);
+  privateMediaToggle.checked=d.disableMediaSave!==false;
+  const on=!!d.enabled;
+  privateChatStatus.textContent=on?'Private mode ON':'Private mode OFF';
+  privateChatStatusSub.textContent=on?'Extra local privacy controls are active':'Normal chat behaviour';
+  privateChatBadge.textContent=on?'🔐 ON':'🔓 OFF';
+}
+function openPrivateChatSettings(){
+  if(!selectedUser||selectedUser.isGroup||!selectedChat)return toastMsg('Open a person chat first.');
+  fillPrivateChatSettings();
+  privateChatModal.classList.remove('hidden');
+}
+function savePrivateChatSettings(){
+  if(!selectedChat)return;
+  const data={enabled:privateModeToggle.checked,hidePreview:privatePreviewToggle.checked,disappear:Number(privateDisappearSelect.value||0),disableMediaSave:privateMediaToggle.checked};
+  savePrivateSettingsLocal(selectedChat.id,data);
+  initSwipeReply(messages,()=>loadedMessages);
+window.__shaanChatReplyHandler=d=>startReply(d);
+updatePrivateHeader();
+  privateChatModal.classList.add('hidden');
+  toastMsg(data.enabled?'Private Chat enabled':'Private Chat disabled');
+}
+function clearPrivateChatLocal(){
+  if(!selectedChat)return;
+  if(!confirm('Clear private settings for this chat on this device?'))return;
+  localStorage.removeItem(privateKey(selectedChat.id));
+  fillPrivateChatSettings();updatePrivateHeader();toastMsg('Private settings cleared');
+}
+privateChatBtn?.addEventListener('click',openPrivateChatSettings);
+$('closePrivateChat')?.addEventListener('click',()=>privateChatModal.classList.add('hidden'));
+$('savePrivateChat')?.addEventListener('click',savePrivateChatSettings);
+$('clearPrivateChatLocal')?.addEventListener('click',clearPrivateChatLocal);
+privateChatModal?.addEventListener('click',e=>{if(e.target===privateChatModal)privateChatModal.classList.add('hidden')});
+
+/* Patch chat-open UI without changing the existing Firestore schema. */
+const _openChatOriginal=openChat;
+openChat=async function(user,element){
+  await _openChatOriginal(user,element);
+  updatePrivateHeader();
+  window.scRefreshChatSettings?.();
+};
+
+/* Generic notification text helper for future/active notification paths. */
+window.getShaanChatNotificationText=(chatId,text)=>{
+  const d=getPrivateSettings(chatId);
+  return d.hidePreview!==false?'New ShaanChat message':(text||'New message');
+};
+
+/* Device-local disappearing-message cleanup. This does not delete the
+   sender's Firestore copy; it only hides expired messages on this device. */
+function privateMessageExpired(message,settings){
+  const seconds=Number(settings?.disappear||0);
+  if(!seconds||!message?.createdAt?.toDate)return false;
+  return (Date.now()-message.createdAt.toDate().getTime())>=seconds*1000;
+}
+const _listenMessagesOriginal=listenMessages;
+listenMessages= function(chatId){
+  const settings=getPrivateSettings(chatId);
+  if(!settings.disappear)return _listenMessagesOriginal(chatId);
+  if(unsubscribeMessages)unsubscribeMessages();
+  const q=query(collection(db,'chats',chatId,'messages'),orderBy('createdAt','asc'));
+  unsubscribeMessages=onSnapshot(q,snap=>{
+    loadedMessages=[];safeSetHTML(messages, '');let visibleCount=0;
+    snap.forEach(x=>{
+      const d={id:x.id,...x.data()};loadedMessages.push(d);
+      if(d.deletedFor&&d.deletedFor[currentUser.uid]===true)return;
+      if(privateMessageExpired(d,settings))return;
+      visibleCount++;renderMessage(d);
+    });
+    if(visibleCount===0)safeSetHTML(messages, '<div class="empty">No visible messages. Say hello 👋</div>');
+    scrollMessages();markMessagesDelivered(chatId);markMessagesSeen(chatId);
+  },e=>{console.error(e);toastMsg('Chat read error: '+e.message)});
+};
+
+updatePrivateHeader();
+
+
+
+/* ===== MODULAR AUTH INITIALIZATION ===== */
+initAuthModule({
+  onUser: async user=>{
+    if(user){
+      currentUser=user;
+      authScreen.style.display="none";app.classList.add("show");
+      await ensureUserProfile();await setPresence(true);await loadMyProfile();listenUsers();listenFriendRequests();
+      await loadGroupIndex();await handleGroupInvite();await handleProfileQrLink();initNotifications();initIncomingCalls();
+      appLockChecked=false;await showAppLockIfEnabled();
+    }else{
+      cleanupRealtimeListeners();
+      currentUser=null;selectedUser=null;selectedChat=null;
+      app.classList.remove("show");authScreen.style.display="flex";
+      messages.replaceChildren();messages.textContent="Select a user to start chatting 💬";
+    }
+  }
+});
+
+
+initAccessibleModals();
