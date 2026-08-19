@@ -255,6 +255,19 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
 #qrReader{width:100%}.qr-scan-note{font-size:10px;color:#8490a5;text-align:center;margin-top:9px;line-height:1.45}
 .theme-light .qr-card{background:#fff}.theme-light .qr-action{background:#fff;color:#142033}
 @media(max-width:650px){.qr-center-grid{grid-template-columns:1fr}.qr-box{width:180px;height:180px}}
+
+/* ===== FINAL CHAT SETTINGS ORGANIZATION ===== */
+#searchMessagesBtn,#privateChatBtn,#blockUserBtn,#groupSettingsBtn{display:none!important}
+.sc-chat-actions-row{display:none!important}
+.chat-settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.chat-setting-card{border:1px solid var(--line);background:rgba(255,255,255,.035);border-radius:16px;padding:14px;text-align:left;cursor:pointer;color:var(--text);transition:.18s}
+.chat-setting-card:hover{transform:translateY(-1px);background:rgba(255,255,255,.06);border-color:rgba(0,234,255,.22)}
+.chat-setting-card:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.chat-setting-icon{font-size:22px;display:block;margin-bottom:7px}
+.chat-setting-card strong{display:block;font-size:13px}
+.chat-setting-card small{display:block;color:#8490a5;font-size:10px;line-height:1.35;margin-top:3px}
+.chat-setting-status{font-size:10px;color:#00eaff;margin-top:5px;min-height:13px}
+@media(max-width:600px){.chat-settings-grid{grid-template-columns:1fr}.chat-tools{gap:4px}.chat-tools .icon-btn{width:35px;height:35px}}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
@@ -343,63 +356,40 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
   <div class="modal-card settings-card">
     <div class="settings-head">
       <div>
-        <div class="modal-title" style="margin-bottom:4px">🧩 Chat Header & Actions</div>
-        <div class="settings-subtitle">Choose which buttons appear at the top of every chat</div>
+        <div class="modal-title" style="margin-bottom:4px">⚙️ Chat Settings</div>
+        <div class="settings-subtitle" id="chatSettingsSubtitle">Manage this conversation</div>
       </div>
       <button class="settings-close" id="scCloseHeaderActions" aria-label="Close">✕</button>
     </div>
 
-    <div class="sc-header-settings-note">
-      These controls only change the ShaanChat header. Call, group and private-chat buttons
-      will still follow their normal availability rules for the selected chat.
-    </div>
-
-    <div class="settings-list" id="scHeaderActionsList">
-      <div class="settings-item sc-action-setting" data-header-action="favourite">
-        <span class="settings-icon">⭐</span>
-        <span class="settings-item-text"><strong>Favourite</strong><small>Quickly favourite the current chat</small></span>
-        <button class="sc-action-toggle on" type="button" aria-label="Toggle Favourite"></button>
-      </div>
-
-      <div class="settings-item sc-action-setting" data-header-action="more">
-        <span class="settings-icon">⋮</span>
-        <span class="settings-item-text"><strong>More menu</strong><small>Focus, draft, chat ID, shortcuts and export</small></span>
-        <button class="sc-action-toggle on" type="button" aria-label="Toggle More menu"></button>
-      </div>
-
-      <div class="settings-item sc-action-setting" data-header-action="search">
-        <span class="settings-icon">🔎</span>
-        <span class="settings-item-text"><strong>Search messages</strong><small>Search messages loaded in the current chat</small></span>
-        <button class="sc-action-toggle on" type="button" aria-label="Toggle Search messages"></button>
-      </div>
-
-      <div class="settings-item sc-action-setting" data-header-action="voice">
-        <span class="settings-icon">📞</span>
-        <span class="settings-item-text"><strong>Voice call</strong><small>Show the voice call button in person chats</small></span>
-        <button class="sc-action-toggle on" type="button" aria-label="Toggle Voice call"></button>
-      </div>
-
-      <div class="settings-item sc-action-setting" data-header-action="video">
-        <span class="settings-icon">📹</span>
-        <span class="settings-item-text"><strong>Video call</strong><small>Show the video call button in person chats</small></span>
-        <button class="sc-action-toggle on" type="button" aria-label="Toggle Video call"></button>
-      </div>
-
-      <div class="settings-item sc-action-setting" data-header-action="security">
-        <span class="settings-icon">⚙️</span>
-        <span class="settings-item-text"><strong>Chat settings</strong><small>Block, report and chat lock controls</small></span>
-        <button class="sc-action-toggle on" type="button" aria-label="Toggle Chat settings"></button>
-      </div>
-
-      <div class="settings-item sc-action-setting" data-header-action="private">
-        <span class="settings-icon">🔐</span>
-        <span class="settings-item-text"><strong>Private chat</strong><small>Private-chat controls for person conversations</small></span>
-        <button class="sc-action-toggle on" type="button" aria-label="Toggle Private chat"></button>
-      </div>
+    <div class="chat-settings-grid" id="chatSettingsGrid">
+      <button class="chat-setting-card" id="chatSettingFavourite" type="button">
+        <span class="chat-setting-icon">⭐</span><strong id="chatSettingFavouriteTitle">Favourite Chat</strong>
+        <small id="chatSettingFavouriteDesc">Add this chat to favourites</small><div class="chat-setting-status" id="chatSettingFavouriteStatus"></div>
+      </button>
+      <button class="chat-setting-card" id="chatSettingMore" type="button">
+        <span class="chat-setting-icon">⋮</span><strong>More Chat Options</strong>
+        <small>Focus, draft, chat ID, shortcuts and export</small>
+      </button>
+      <button class="chat-setting-card" id="chatSettingSearch" type="button">
+        <span class="chat-setting-icon">🔎</span><strong>Search Messages</strong>
+        <small>Search and highlight messages in this chat</small>
+      </button>
+      <button class="chat-setting-card" id="chatSettingPrivate" type="button">
+        <span class="chat-setting-icon">🔐</span><strong>Private Chat</strong>
+        <small>Private-chat controls</small>
+      </button>
+      <button class="chat-setting-card" id="chatSettingSecurity" type="button">
+        <span class="chat-setting-icon">🛡️</span><strong>Privacy & Security</strong>
+        <small>Block, report and chat lock</small>
+      </button>
+      <button class="chat-setting-card" id="chatSettingGroup" type="button">
+        <span class="chat-setting-icon">👥</span><strong>Group Settings</strong>
+        <small>Members, permissions and group info</small>
+      </button>
     </div>
 
     <div class="modal-actions">
-      <button class="small-btn" id="scResetHeaderActions">Reset</button>
       <button class="small-btn" id="scDoneHeaderActions">Done</button>
     </div>
   </div>
@@ -453,7 +443,7 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
       </button>
 
       <button class="settings-item" id="privacySecurityBtn"><span class="settings-icon">🔐</span><span class="settings-item-text"><strong>Privacy & Security</strong><small>Blocking, privacy, chat lock & account security</small></span><span class="settings-arrow">›</span></button>
-      <button class="settings-item" id="scHeaderActionsBtn"><span class="settings-icon">🧩</span><span class="settings-item-text"><strong>Chat & Call Controls</strong><small>Voice call, video call, search, chat settings & header buttons</small></span><span class="settings-arrow">›</span></button>
+      <button class="settings-item" id="scHeaderActionsBtn"><span class="settings-icon">⚙️</span><span class="settings-item-text"><strong>Chat Settings</strong><small>Favourite, More, Search, privacy and conversation controls</small></span><span class="settings-arrow">›</span></button>
       <div class="settings-divider"></div>
 
       
@@ -2147,7 +2137,7 @@ privacySecurityBtn.onclick=async()=>{settingsModal.classList.add("hidden");await
 $("closePrivacy").onclick=()=>privacyModal.classList.add("hidden");$("donePrivacy").onclick=()=>privacyModal.classList.add("hidden");$("savePrivacy").onclick=savePrivacySettings;$("blockedUsersBtn").onclick=openBlockedUsers;$("reportUserBtn").onclick=reportSelectedUser;$("chatLockBtn").onclick=lockCurrentChat;$("appPinBtn").onclick=async()=>{privacyModal.classList.add("hidden");await updateAppLockStatus();appLockModal.classList.remove("hidden")};$("accountSecurityBtn").onclick=async()=>{privacyModal.classList.add("hidden");await accountSecurity()};
 $("closeAppLock").onclick=()=>appLockModal.classList.add("hidden");$("setAppPinVisible").onclick=setAppPin;$("removeAppPinVisible").onclick=removeAppPin;
 $("closeAccountSecurity").onclick=()=>accountSecurityModal.classList.add("hidden");$("closeAccountSecurity2").onclick=()=>accountSecurityModal.classList.add("hidden");$("sendResetVisible").onclick=sendResetEmailVisible;$("verifyEmailVisible").onclick=resendVerification;
-chatSecurityBtn.onclick=openChatSecurity;$("closeChatSecurity").onclick=()=>chatSecurityModal.classList.add("hidden");chatBlockAction.onclick=async()=>{await blockSelectedUser();await updateChatSecurityLabels()};chatReportAction.onclick=async()=>{await reportSelectedUser();chatSecurityModal.classList.add("hidden")};chatLockAction.onclick=async()=>{await lockCurrentChat();await updateChatSecurityLabels()};
+chatSecurityBtn.onclick=()=>openHeaderActions();$("closeChatSecurity").onclick=()=>chatSecurityModal.classList.add("hidden");chatBlockAction.onclick=async()=>{await blockSelectedUser();await updateChatSecurityLabels()};chatReportAction.onclick=async()=>{await reportSelectedUser();chatSecurityModal.classList.add("hidden")};chatLockAction.onclick=async()=>{await lockCurrentChat();await updateChatSecurityLabels()};
 $("closeSettings").onclick=()=>settingsModal.classList.add("hidden");
 
 $("settingsLogoutBtn").onclick=async()=>{
@@ -3622,134 +3612,64 @@ body.sc-reduced-motion *,body.sc-reduced-motion *::before,body.sc-reduced-motion
     }
   });
 
-  /* ---------- header action bar ---------- */
-  const header=document.querySelector(".chat-header");
-  const tools=document.querySelector(".chat-tools");
-  if(header && tools && !document.querySelector(".sc-chat-actions-row")){
-    const row=document.createElement("div");row.className="sc-chat-actions-row";
-    const fav=document.createElement("button");fav.className="sc-chat-action";fav.title="Favourite chat";fav.textContent="⭐";
-    const menuWrap=document.createElement("div");menuWrap.className="sc-header-menu";
-    const menuBtn=document.createElement("button");menuBtn.className="sc-chat-action";menuBtn.textContent="⋮";menuBtn.title="More chat actions";
-    const menu=document.createElement("div");menu.className="sc-menu hidden";
-    menu.innerHTML=`
-      <button data-action="focus">🎯 <span>Focus mode</span></button>
-      <button data-action="clearDraft">🧹 <span>Clear draft</span></button>
-      <button data-action="copyId">🆔 <span>Copy chat ID</span></button>
-      <button data-action="shortcuts">⌨️ <span>Keyboard shortcuts</span></button>
-      <hr>
-      <button data-action="export">📤 <span>Export visible messages</span></button>`;
-    menuWrap.append(menuBtn,menu);row.append(fav,menuWrap);
-    tools.prepend(row);
-    function favKey(){return selectedChat?.id||selectedUser?.id||"none"}
-    function isFav(){return Array.isArray(state.favourites)&&state.favourites.includes(favKey())}
-    function refreshFav(){fav.classList.toggle("active",isFav());fav.title=isFav()?"Remove favourite":"Favourite chat"}
-    function toggleFavourite(){
-      const key=favKey();if(key==="none")return toast("Select a chat first");
-      state.favourites=Array.isArray(state.favourites)?state.favourites:[];
-      const i=state.favourites.indexOf(key);
-      if(i>=0){state.favourites.splice(i,1);toast("Removed from favourites")}
-      else{state.favourites.push(key);toast("Chat added to favourites")}
-      saveState();refreshFav();
-    }
-    window.toggleFavourite=toggleFavourite;
-    fav.onclick=()=>{toggleFavourite();vibrate()};
-    menuBtn.onclick=e=>{e.stopPropagation();menu.classList.toggle("hidden")};
-    document.addEventListener("click",e=>{if(!menuWrap.contains(e.target))menu.classList.add("hidden")});
-    menu.onclick=async e=>{
-      const b=e.target.closest("[data-action]");if(!b)return;
-      menu.classList.add("hidden");const action=b.dataset.action;
-      if(action==="focus")toggleFocusMode();
-      if(action==="clearDraft"){if(selectedChat)localStorage.removeItem(draftKey());if(input){input.value="";draftNote.classList.remove("show")}toast("Draft cleared")}
-      if(action==="copyId"){const id=selectedChat?.id;if(!id)return toast("Select a chat first");navigator.clipboard?.writeText(id).then(()=>toast("Chat ID copied")).catch(()=>toast("Clipboard unavailable"))}
-      if(action==="shortcuts")openShortcuts();
-      if(action==="export")exportVisibleMessages();
-    };
-    window.scRefreshFavourite=refreshFav;
-    refreshFav();
-  }
-
-  /* ---------- configurable chat header actions ---------- */
-  const headerActionDefaults={
-    favourite:true, more:true, search:true, voice:true, video:true, security:true, private:true
-  };
+  /* ---------- FINAL CHAT SETTINGS (all chat actions live here) ---------- */
+  const headerActionDefaults={favourite:true,more:true,search:true,voice:true,video:true,security:true,private:true};
   state.headerActions=Object.assign({},headerActionDefaults,state.headerActions||{});
-
-  function headerActionEnabled(key){
-    return state.headerActions?.[key]!==false;
-  }
-
+  function headerActionEnabled(key){return state.headerActions?.[key]!==false}
   function applyHeaderActionVisibility(){
-    const row=document.querySelector(".sc-chat-actions-row");
-    const fav=row?.querySelector(".sc-chat-action");
-    const menuWrap=row?.querySelector(".sc-header-menu");
-    if(fav)fav.classList.toggle("sc-action-hidden",!headerActionEnabled("favourite"));
-    if(menuWrap)menuWrap.classList.toggle("sc-action-hidden",!headerActionEnabled("more"));
-
-    const map={
-      search:"searchMessagesBtn",
-      voice:"voiceCallBtn",
-      video:"videoCallBtn",
-      security:"chatSecurityBtn",
-      private:"privateChatBtn"
-    };
-    Object.entries(map).forEach(([key,id])=>{
-      const el=q(id);
-      if(el)el.classList.toggle("sc-action-hidden",!headerActionEnabled(key));
-    });
+    // Calls stay in the header; all other chat actions are inside Chat Settings.
+    q("searchMessagesBtn")?.classList.add("sc-action-hidden");
+    q("privateChatBtn")?.classList.add("sc-action-hidden");
+    q("blockUserBtn")?.classList.add("sc-action-hidden");
+    q("groupSettingsBtn")?.classList.add("sc-action-hidden");
+    q("voiceCallBtn")?.classList.toggle("sc-action-hidden",!headerActionEnabled("voice"));
+    q("videoCallBtn")?.classList.toggle("sc-action-hidden",!headerActionEnabled("video"));
   }
-
-  function saveHeaderActionPrefs(){
-    saveState();
-    applyHeaderActionVisibility();
-    toast("Chat header settings saved");
+  function updateChatSettingsCard(){
+    const key=selectedChat?.id||selectedUser?.id||"none";
+    const fav=Array.isArray(state.favourites)&&state.favourites.includes(key);
+    const title=q("chatSettingFavouriteTitle"),desc=q("chatSettingFavouriteDesc"),status=q("chatSettingFavouriteStatus");
+    if(title)title.textContent=fav?"Remove from Favourites":"Favourite Chat";
+    if(desc)desc.textContent=fav?"Remove this conversation from favourites":"Add this conversation to favourites";
+    if(status)status.textContent=fav?"★ Favourite active":"";
+    const person=!!selectedUser&&!selectedUser.isGroup, group=!!selectedUser?.isGroup;
+    [
+      ["chatSettingPrivate",person],["chatSettingSecurity",person],["chatSettingGroup",group]
+    ].forEach(([id,on])=>{const el=q(id);if(el){el.disabled=!on;el.style.pointerEvents=on?"auto":"none";el.style.opacity=on?"1":".42"}});
   }
-
   function openHeaderActions(){
-    const modal=q("scHeaderActionsModal");
-    if(!modal)return;
-    modal.querySelectorAll("[data-header-action]").forEach(item=>{
-      const key=item.dataset.headerAction;
-      const toggle=item.querySelector(".sc-action-toggle");
-      const on=headerActionEnabled(key);
-      toggle?.classList.toggle("on",on);
-      toggle?.setAttribute("aria-pressed",String(on));
-    });
-    modal.classList.remove("hidden");
+    if(!requireChatForSettings())return;
+    updateChatSettingsCard();
+    q("scHeaderActionsModal")?.classList.remove("hidden");
   }
-
-  function resetHeaderActions(){
-    state.headerActions=Object.assign({},headerActionDefaults);
-    saveState();
-    openHeaderActions();
-    applyHeaderActionVisibility();
+  function requireChatForSettings(){
+    if(!selectedChat&&!selectedUser){toast("Select a chat first");return false}
+    return true
   }
-
-  q("scHeaderActionsBtn")?.addEventListener("click",()=>{
-    q("settingsModal")?.classList.add("hidden");
-    openHeaderActions();
-  });
+  q("scHeaderActionsBtn")?.addEventListener("click",()=>{q("settingsModal")?.classList.add("hidden");openHeaderActions()});
+  q("chatSecurityBtn")?.addEventListener("click",openHeaderActions);
   q("scCloseHeaderActions")?.addEventListener("click",()=>q("scHeaderActionsModal")?.classList.add("hidden"));
   q("scDoneHeaderActions")?.addEventListener("click",()=>q("scHeaderActionsModal")?.classList.add("hidden"));
-  q("scResetHeaderActions")?.addEventListener("click",resetHeaderActions);
-
-  q("scHeaderActionsModal")?.querySelectorAll("[data-header-action]").forEach(item=>{
-    const toggle=item.querySelector(".sc-action-toggle");
-    toggle?.addEventListener("click",e=>{
-      e.stopPropagation();
-      const key=item.dataset.headerAction;
-      state.headerActions[key]=!headerActionEnabled(key);
-      toggle.classList.toggle("on",state.headerActions[key]);
-      toggle.setAttribute("aria-pressed",String(state.headerActions[key]));
-      saveHeaderActionPrefs();
-    });
+  q("chatSettingFavourite")?.addEventListener("click",()=>{if(!requireChatForSettings())return;toggleFavourite();updateChatSettingsCard()});
+  q("chatSettingSearch")?.addEventListener("click",()=>{if(!requireChatForSettings())return;q("scHeaderActionsModal")?.classList.add("hidden");q("searchMessagesBtn")?.click()});
+  q("chatSettingPrivate")?.addEventListener("click",()=>{if(!requireChatForSettings()||selectedUser?.isGroup)return;q("scHeaderActionsModal")?.classList.add("hidden");q("privateChatBtn")?.click()});
+  q("chatSettingSecurity")?.addEventListener("click",()=>{if(!requireChatForSettings()||selectedUser?.isGroup)return;q("scHeaderActionsModal")?.classList.add("hidden");openChatSecurity()});
+  q("chatSettingGroup")?.addEventListener("click",()=>{if(!requireChatForSettings()||!selectedUser?.isGroup)return;q("scHeaderActionsModal")?.classList.add("hidden");q("groupSettingsBtn")?.click()});
+  q("chatSettingMore")?.addEventListener("click",()=>{
+    if(!requireChatForSettings())return;
+    const id=selectedChat?.id||selectedUser?.id||"";
+    const choice=prompt("More Chat Options:\n1 = Focus mode\n2 = Clear draft\n3 = Copy chat ID\n4 = Keyboard shortcuts\n5 = Export visible messages", "");
+    if(choice==="1")toggleFocusMode();
+    else if(choice==="2"){localStorage.removeItem(draftKey());if(input){input.value=""}if(draftNote)draftNote.classList.remove("show");toast("Draft cleared")}
+    else if(choice==="3"){if(!id)return toast("Chat ID unavailable");navigator.clipboard?.writeText(id).then(()=>toast("Chat ID copied")).catch(()=>toast("Clipboard unavailable"))}
+    else if(choice==="4")openShortcuts();
+    else if(choice==="5")exportVisibleMessages();
   });
-
-  q("scHeaderActionsModal")?.addEventListener("click",e=>{
-    if(e.target===q("scHeaderActionsModal"))q("scHeaderActionsModal").classList.add("hidden");
-  });
-
+  q("scHeaderActionsModal")?.addEventListener("click",e=>{if(e.target===q("scHeaderActionsModal"))q("scHeaderActionsModal").classList.add("hidden")});
+  window.scRefreshFavourite=updateChatSettingsCard;
+  window.scRefreshChatSettings=()=>{applyHeaderActionVisibility();updateChatSettingsCard()};
   applyHeaderActionVisibility();
-  restoreChatHeaderControls();
+  updateChatSettingsCard();
 
   /* ---------- REAL CHAT ACTIONS INSIDE MAIN SETTINGS ---------- */
   function requireChat(action){
@@ -3781,22 +3701,16 @@ body.sc-reduced-motion *,body.sc-reduced-motion *::before,body.sc-reduced-motion
   function restoreChatHeaderControls(){
     const person=!!selectedUser&&!selectedUser.isGroup;
     const group=!!selectedUser?.isGroup;
-    const controls=[
-      ["voiceCallBtn",person,"voice"],
-      ["videoCallBtn",person,"video"],
-      ["chatSecurityBtn",person,"security"],
-      ["privateChatBtn",person,"private"],
-      ["groupSettingsBtn",group,null]
-    ];
-    controls.forEach(([id,available,pref])=>{
-      const el=q(id);
-      if(!el)return;
-      el.classList.toggle("hidden",!available);
-      if(pref)el.classList.toggle("sc-action-hidden",!headerActionEnabled(pref));
-    });
-    const search=q("searchMessagesBtn");
-    if(search)search.classList.toggle("sc-action-hidden",!headerActionEnabled("search"));
+    const voice=q("voiceCallBtn"), video=q("videoCallBtn");
+    if(voice)voice.classList.toggle("hidden",!person);
+    if(video)video.classList.toggle("hidden",!person);
+    q("chatSecurityBtn")?.classList.add("hidden");
+    q("searchMessagesBtn")?.classList.add("sc-action-hidden");
+    q("privateChatBtn")?.classList.add("sc-action-hidden");
+    q("blockUserBtn")?.classList.add("sc-action-hidden");
+    q("groupSettingsBtn")?.classList.add("sc-action-hidden");
     refreshChatSettingsAvailability();
+    updateChatSettingsCard();
   }
   window.scRestoreChatHeaderControls=restoreChatHeaderControls;
 
