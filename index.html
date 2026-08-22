@@ -889,24 +889,7 @@ html.sc-high-contrast .settings-item,html.sc-high-contrast .settings-control-row
     </div>
   </div>
 </div>
-  <div class="modal-card settings-card settings-page-card">
-    <div class="settings-stat"><div class="settings-stat-card"><strong>₹0</strong><small>Wallet balance</small></div><div class="settings-stat-card"><strong>0</strong><small>Transactions</small></div></div>
-    <div class="settings-list">
-      <button class="settings-item" id="paymentMethodsBtn"><span class="settings-icon">💳</span><span class="settings-item-text"><strong>Payment methods</strong><small>Manage UPI or payment methods</small></span><span class="settings-arrow">›</span></button>
-      <button class="settings-item" id="paymentHistoryBtn"><span class="settings-icon">🧾</span><span class="settings-item-text"><strong>Payment history</strong><small>View your ShaanChat transactions</small></span><span class="settings-arrow">›</span></button>
-      <div class="settings-note">Payment UI is ready, but real money movement requires a secure payment provider/backend. No fake transaction is created by this frontend.</div>
-    </div>
-  </div>
-</div>
-  <div class="modal-card settings-card settings-page-card">
-    <div class="settings-stat"><div class="settings-stat-card"><strong>Free</strong><small>Current plan</small></div><div class="settings-stat-card"><strong>Inactive</strong><small>Premium status</small></div></div>
-    <div class="settings-list">
-      <button class="settings-item" id="premiumBenefitsBtn"><span class="settings-icon">✨</span><span class="settings-item-text"><strong>Premium benefits</strong><small>AI, storage and advanced features</small></span><span class="settings-arrow">›</span></button>
-      <button class="settings-item" id="subscriptionPlansBtn"><span class="settings-icon">📦</span><span class="settings-item-text"><strong>Plans</strong><small>Choose a future premium plan</small></span><span class="settings-arrow">›</span></button>
-      <div class="settings-note">Subscription checkout is not faked here. Connect a verified payment/subscription backend before charging users.</div>
-    </div>
-  </div>
-</div>
+
 
 <!-- Lists -->
 <div class="modal hidden" id="listsSettingsModal">
@@ -4955,6 +4938,7 @@ updatePrivateHeader();
   });
 
   [
+    ["closeLinkedDevices","linkedDevicesModal"],
     ["closeAccountSettings","accountSettingsModal"],["closeListsSettings","listsSettingsModal"],["closeChatsSettings","chatsSettingsModal"],
     ["closeNotifySettings","notifySettingsModal"],["closeStorageSettings","storageSettingsModal"],["closeAccessibilitySettings","accessibilitySettingsModal"],
     ["closeLanguageSettings","languageSettingsModal"],["closeHelpSettings","helpSettingsModal"]
@@ -5175,6 +5159,7 @@ updatePrivateHeader();
   q("helpAboutBtn").onclick=()=>alert("ShaanChat Pro\nAI-powered real-time messaging app.\n\nSettings Upgrade v3");
 
   /* Close new pages when tapping backdrop */
+  ["linkedDevicesModal","accountSettingsModal","listsSettingsModal","chatsSettingsModal","notifySettingsModal","storageSettingsModal","accessibilitySettingsModal","languageSettingsModal","helpSettingsModal","privacySelectorModal"].forEach(id=>{
     q(id)?.addEventListener("click",e=>{if(e.target===q(id))closeModal(id);});
   });
 
