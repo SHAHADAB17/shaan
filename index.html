@@ -430,9 +430,73 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
   .ai-key-row,.ai-model-row,.ai-send-row{flex-direction:column}
 }
 
+
+/* ===== SHAANCHAT SETTINGS / WHATSAPP-STYLE SETTINGS PACK ===== */
+.settings-section-label{
+  padding:10px 4px 5px;color:#68758c;font-size:10px;text-transform:uppercase;
+  letter-spacing:.12em;font-weight:800
+}
+.settings-note{
+  padding:10px 12px;border:1px solid var(--line);border-radius:12px;
+  background:rgba(0,234,255,.045);color:#8490a5;font-size:10px;line-height:1.5
+}
+.settings-value{
+  margin-left:auto;color:#8490a5;font-size:11px;white-space:nowrap
+}
+.settings-toggle{
+  width:44px;height:25px;border:0;border-radius:99px;background:#263246;
+  position:relative;cursor:pointer;flex-shrink:0
+}
+.settings-toggle::after{
+  content:"";position:absolute;width:19px;height:19px;left:3px;top:3px;
+  border-radius:50%;background:#aeb8c8;transition:.18s
+}
+.settings-toggle.on{background:#20c77a}
+.settings-toggle.on::after{left:22px;background:#06140d}
+.settings-control-row{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:12px;border:1px solid var(--line);border-radius:12px;background:#101827
+}
+.settings-control-row .control-text{min-width:0;flex:1}
+.settings-control-row strong{display:block;font-size:12px}
+.settings-control-row small{display:block;color:#8490a5;font-size:10px;line-height:1.35;margin-top:3px}
+.settings-select{
+  width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;
+  background:#070b14;color:#fff;outline:none
+}
+.settings-page-card{max-width:520px}
+.settings-page-list{display:flex;flex-direction:column;gap:8px}
+.settings-page-title{font-size:20px;font-weight:850}
+.settings-page-sub{font-size:11px;color:#8490a5;margin-top:3px}
+.settings-stat{
+  display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0
+}
+.settings-stat-card{
+  border:1px solid var(--line);border-radius:12px;padding:12px;background:#101827
+}
+.settings-stat-card strong{display:block;font-size:16px}
+.settings-stat-card small{display:block;color:#8490a5;font-size:9px;margin-top:3px}
+.settings-danger{color:#ff9aaa!important}
+.theme-light .settings-control-row,.theme-light .settings-stat-card{background:#fff;color:#142033}
+.theme-light .settings-select{background:#fff;color:#142033}
+@media(max-width:600px){
+  .settings-stat{grid-template-columns:1fr}
+  .settings-page-card{max-width:calc(100vw - 20px)}
+}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+<style id="sc-settings-accessibility-css">
+html.sc-large-text .settings-item-text strong{font-size:15px}
+html.sc-large-text .settings-item-text small{font-size:12px}
+html.sc-large-text .chat-title,html.sc-large-text .message-input{font-size:15px!important}
+html.sc-reduce-motion *,html.sc-reduce-motion *::before,html.sc-reduce-motion *::after{animation-duration:.001ms!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
+html.sc-high-contrast{--line:rgba(255,255,255,.22)}
+html.sc-high-contrast .settings-item,html.sc-high-contrast .settings-control-row{border-color:rgba(255,255,255,.28)}
+</style>
+
 </head>
 <body>
 
@@ -567,8 +631,11 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
   </div>
 </div>
 
+
+<button id="notifyBtn" class="hidden" aria-hidden="true" type="button"></button>
+
 <div class="modal hidden" id="settingsModal">
-  <div class="modal-card settings-card">
+  <div class="modal-card settings-card settings-page-card">
     <div class="settings-head">
       <div>
         <div class="modal-title" style="margin-bottom:4px">Settings</div>
@@ -584,27 +651,23 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
         <span class="settings-arrow">›</span>
       </button>
 
-      <button class="settings-item" id="qrCenterBtn">
-        <span class="settings-icon">▣</span>
-        <span class="settings-item-text"><strong>QR Center</strong><small>Share your profile QR or let friends install ShaanChat</small></span>
+      <button class="settings-item" id="linkedDevicesBtn">
+        <span class="settings-icon">💻</span>
+        <span class="settings-item-text"><strong>Linked devices</strong><small>Use ShaanChat on other devices</small></span>
         <span class="settings-arrow">›</span>
       </button>
 
-      <button class="settings-item" id="groupBtn">
-        <span class="settings-icon">👥</span>
-        <span class="settings-item-text"><strong>New group</strong><small>Create a group chat</small></span>
+      <div class="settings-section-label">Account</div>
+
+      <button class="settings-item" id="accountSettingsBtn">
+        <span class="settings-icon">🔑</span>
+        <span class="settings-item-text"><strong>Account</strong><small>Security, email verification and password recovery</small></span>
         <span class="settings-arrow">›</span>
       </button>
 
-      <button class="settings-item" id="themeBtn">
-        <span class="settings-icon">🌙</span>
-        <span class="settings-item-text"><strong>Theme</strong><small>Switch between dark and light mode</small></span>
-        <span class="settings-arrow">›</span>
-      </button>
-
-      <button class="settings-item" id="notifyBtn">
-        <span class="settings-icon">🔔</span>
-        <span class="settings-item-text"><strong>Notifications</strong><small>Enable browser push notifications</small></span>
+      <button class="settings-item" id="privacySecurityBtn">
+        <span class="settings-icon">🔐</span>
+        <span class="settings-item-text"><strong>Privacy</strong><small>Last seen, profile photo, status, read receipts and more</small></span>
         <span class="settings-arrow">›</span>
       </button>
 
@@ -614,12 +677,67 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
         <span class="settings-arrow">›</span>
       </button>
 
-      <button class="settings-item" id="privacySecurityBtn"><span class="settings-icon">🔐</span><span class="settings-item-text"><strong>Privacy & Security</strong><small>Blocking, privacy, chat lock & account security</small></span><span class="settings-arrow">›</span></button>
-      <button class="settings-item" id="scHeaderActionsBtn"><span class="settings-icon">⚙️</span><span class="settings-item-text"><strong>Chat Settings</strong><small>Favourite, More, Search, privacy and conversation controls</small></span><span class="settings-arrow">›</span></button>
-      <div class="settings-divider"></div>
+      <button class="settings-item" id="listsSettingsBtn">
+        <span class="settings-icon">📋</span>
+        <span class="settings-item-text"><strong>Lists</strong><small>Manage custom people and chat lists</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
 
-      
-<button class="settings-item settings-logout" id="settingsLogoutBtn">
+      <div class="settings-section-label">Preferences</div>
+
+      <button class="settings-item" id="chatsSettingsBtn">
+        <span class="settings-icon">💬</span>
+        <span class="settings-item-text"><strong>Chats</strong><small>Chat history, appearance, wallpaper and message options</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
+
+      <button class="settings-item" id="notifySettingsBtn">
+        <span class="settings-icon">🔔</span>
+        <span class="settings-item-text"><strong>Notifications</strong><small>Message alerts, previews and sounds</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
+
+      <button class="settings-item" id="storageSettingsBtn">
+        <span class="settings-icon">🗄️</span>
+        <span class="settings-item-text"><strong>Storage and data</strong><small>Media download, data usage and local cache</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
+
+      <button class="settings-item" id="accessibilitySettingsBtn">
+        <span class="settings-icon">♿</span>
+        <span class="settings-item-text"><strong>Accessibility</strong><small>Motion, text size and high-contrast options</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
+
+      <button class="settings-item" id="languageSettingsBtn">
+        <span class="settings-icon">🌐</span>
+        <span class="settings-item-text"><strong>App language</strong><small>Choose the language for the ShaanChat interface</small></span>
+        <span class="settings-value" id="settingsLanguageValue">English</span>
+        <span class="settings-arrow">›</span>
+      </button>
+
+      <div class="settings-section-label">Support</div>
+
+      <button class="settings-item" id="helpSettingsBtn">
+        <span class="settings-icon">❓</span>
+        <span class="settings-item-text"><strong>Help</strong><small>FAQ, contact support and app information</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
+
+      <button class="settings-item" id="inviteSettingsBtn">
+        <span class="settings-icon">📨</span>
+        <span class="settings-item-text"><strong>Invite a friend</strong><small>Share ShaanChat with your friends</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
+
+      <button class="settings-item" id="themeBtn">
+        <span class="settings-icon">🌙</span>
+        <span class="settings-item-text"><strong>Theme</strong><small>Switch between dark and light mode</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
+
+      <div class="settings-divider"></div>
+      <button class="settings-item settings-logout" id="settingsLogoutBtn">
         <span class="settings-icon">↪️</span>
         <span class="settings-item-text"><strong>Logout</strong><small>Sign out of this account</small></span>
         <span class="settings-arrow">›</span>
@@ -628,7 +746,253 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
   </div>
 </div>
 
-<div class="modal hidden" id="privacyModal"><div class="modal-card settings-card"><div class="settings-head"><div><div class="modal-title" style="margin-bottom:4px">🔐 Privacy & Security</div><div class="settings-subtitle">Control your privacy and account protection</div></div><button class="settings-close" id="closePrivacy">✕</button></div><div class="settings-list"><button class="settings-item" id="blockedUsersBtn"><span class="settings-icon">🚫</span><span class="settings-item-text"><strong>Blocked Users</strong><small>Block or unblock people</small></span><span class="settings-arrow">›</span></button><button class="settings-item" id="reportUserBtn"><span class="settings-icon">🚩</span><span class="settings-item-text"><strong>Report User</strong><small>Report spam or abuse</small></span><span class="settings-arrow">›</span></button><div class="permission-list"><div class="modal-title" style="font-size:15px;margin-bottom:6px">👁️ Last Seen</div><select class="input" id="lastSeenPrivacy"><option value="everyone">Everyone</option><option value="contacts">My Contacts</option><option value="nobody">Nobody</option></select><div class="modal-title" style="font-size:15px;margin-bottom:6px">🟢 Online Status</div><select class="input" id="onlinePrivacy"><option value="everyone">Everyone</option><option value="contacts">My Contacts</option><option value="nobody">Nobody</option></select></div><button class="settings-item" id="chatLockBtn"><span class="settings-icon">🔒</span><span class="settings-item-text"><strong>Chat Lock</strong><small>Lock or unlock the selected chat</small></span><span class="settings-arrow">›</span></button><button class="settings-item" id="appPinBtn"><span class="settings-icon">🔑</span><span class="settings-item-text"><strong>App Lock / PIN</strong><small>Set, change or remove your PIN</small></span><span class="settings-arrow">›</span></button><button class="settings-item" id="accountSecurityBtn"><span class="settings-icon">🛡️</span><span class="settings-item-text"><strong>Account Security</strong><small>Review email and send password reset</small></span><span class="settings-arrow">›</span></button><div class="modal-actions"><button class="small-btn" id="savePrivacy">Save privacy</button><button class="small-btn" id="donePrivacy">Done</button></div></div></div></div>
+<!-- WhatsApp-style Privacy page -->
+<div class="modal hidden" id="privacyModal">
+  <div class="modal-card settings-card settings-page-card">
+    <div class="settings-head">
+      <div>
+        <div class="modal-title" style="margin-bottom:4px">Privacy</div>
+        <div class="settings-subtitle">Who can see your personal information</div>
+      </div>
+      <button class="settings-close" id="closePrivacy">✕</button>
+    </div>
+
+    <div class="settings-list">
+      <div class="settings-section-label">Who can see my personal info</div>
+
+      <button class="settings-item" id="privacyLastSeenRow">
+        <span class="settings-icon">👀</span>
+        <span class="settings-item-text"><strong>Last seen and online</strong><small id="privacyLastSeenSummary">Everyone</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
+
+      <button class="settings-item" id="privacyProfilePhotoRow">
+        <span class="settings-icon">🖼️</span>
+        <span class="settings-item-text"><strong>Profile picture</strong><small id="privacyProfilePhotoSummary">Everyone</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
+
+      <button class="settings-item" id="privacyAboutRow">
+        <span class="settings-icon">ℹ️</span>
+        <span class="settings-item-text"><strong>About</strong><small id="privacyAboutSummary">Everyone</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
+
+      <button class="settings-item" id="privacyLinksRow">
+        <span class="settings-icon">🔗</span>
+        <span class="settings-item-text"><strong>Links</strong><small id="privacyLinksSummary">My contacts</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
+
+      <button class="settings-item" id="privacyStatusRow">
+        <span class="settings-icon">⭕</span>
+        <span class="settings-item-text"><strong>Status</strong><small id="privacyStatusSummary">My contacts</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
+
+      <div class="settings-section-label">Messages</div>
+
+      <div class="settings-control-row">
+        <div class="control-text"><strong>Read receipts</strong><small>When turned off, read receipts are not exchanged in private chats.</small></div>
+        <button class="settings-toggle" id="privacyReadReceiptsToggle" aria-label="Read receipts"></button>
+      </div>
+
+      <button class="settings-item" id="privacyDefaultTimerRow">
+        <span class="settings-icon">👻</span>
+        <span class="settings-item-text"><strong>Default message timer</strong><small id="privacyDefaultTimerSummary">Off</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
+
+      <div class="settings-section-label">Groups and calls</div>
+
+      <button class="settings-item" id="privacyGroupsRow">
+        <span class="settings-icon">👥</span>
+        <span class="settings-item-text"><strong>Groups</strong><small id="privacyGroupsSummary">Everyone</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
+
+      <button class="settings-item" id="privacyLiveLocationRow">
+        <span class="settings-icon">📍</span>
+        <span class="settings-item-text"><strong>Live location</strong><small id="privacyLiveLocationSummary">My contacts</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
+
+      <button class="settings-item" id="privacyCallsRow">
+        <span class="settings-icon">📞</span>
+        <span class="settings-item-text"><strong>Calls</strong><small id="privacyCallsSummary">Everyone</small></span>
+        <span class="settings-arrow">›</span>
+      </button>
+
+      <div class="settings-section-label">Security</div>
+      <button class="settings-item" id="blockedUsersBtn"><span class="settings-icon">🚫</span><span class="settings-item-text"><strong>Blocked users</strong><small>Block or unblock people</small></span><span class="settings-arrow">›</span></button>
+      <button class="settings-item" id="reportUserBtn"><span class="settings-icon">🚩</span><span class="settings-item-text"><strong>Report user</strong><small>Report spam or abuse</small></span><span class="settings-arrow">›</span></button>
+      <button class="settings-item" id="chatLockBtn"><span class="settings-icon">🔒</span><span class="settings-item-text"><strong>Chat Lock</strong><small>Lock or unlock the selected chat</small></span><span class="settings-arrow">›</span></button>
+      <button class="settings-item" id="appPinBtn"><span class="settings-icon">🔑</span><span class="settings-item-text"><strong>App Lock / PIN</strong><small>Set, change or remove your PIN</small></span><span class="settings-arrow">›</span></button>
+
+      <div class="modal-actions">
+        <button class="small-btn" id="savePrivacy">Save privacy</button>
+        <button class="small-btn" id="donePrivacy">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Privacy selector -->
+<div class="modal hidden" id="privacySelectorModal">
+  <div class="modal-card settings-card settings-page-card">
+    <div class="settings-head">
+      <div><div class="modal-title" id="privacySelectorTitle">Privacy</div><div class="settings-subtitle" id="privacySelectorSub">Choose who can see this</div></div>
+      <button class="settings-close" id="closePrivacySelector">✕</button>
+    </div>
+    <div class="settings-list" id="privacySelectorList"></div>
+  </div>
+</div>
+
+<!-- Account -->
+<div class="modal hidden" id="accountSettingsModal">
+  <div class="modal-card settings-card settings-page-card">
+    <div class="settings-head">
+      <div><div class="modal-title">🔑 Account</div><div class="settings-subtitle">Manage your ShaanChat account</div></div>
+      <button class="settings-close" id="closeAccountSettings">✕</button>
+    </div>
+    <div class="settings-list">
+      <div class="permission-list">
+        <div style="font-size:11px;color:#8490a5">Signed-in email</div>
+        <div id="accountSettingsEmail" style="font-weight:800;margin-top:4px;word-break:break-all">—</div>
+        <div id="accountSettingsVerified" style="font-size:10px;color:#48e6a1;margin-top:5px">—</div>
+      </div>
+      <button class="settings-item" id="accountPasswordReset"><span class="settings-icon">📧</span><span class="settings-item-text"><strong>Password reset</strong><small>Send a password reset link to your email</small></span><span class="settings-arrow">›</span></button>
+      <button class="settings-item" id="accountVerifyEmail"><span class="settings-icon">✅</span><span class="settings-item-text"><strong>Email verification</strong><small>Verify your email or resend verification</small></span><span class="settings-arrow">›</span></button>
+      <button class="settings-item" id="accountSecurityExisting"><span class="settings-icon">🛡️</span><span class="settings-item-text"><strong>Advanced account security</strong><small>Open existing account security controls</small></span><span class="settings-arrow">›</span></button>
+      <div class="settings-note">Account deletion and number-change flows should use Firebase re-authentication before any destructive operation.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Linked devices -->
+<div class="modal hidden" id="linkedDevicesModal">
+  <div class="modal-card settings-card settings-page-card">
+    <div class="settings-head">
+      <div><div class="modal-title">💻 Linked devices</div><div class="settings-subtitle">Use ShaanChat on other devices</div></div>
+      <button class="settings-close" id="closeLinkedDevices">✕</button>
+    </div>
+    <div class="settings-stat">
+      <div class="settings-stat-card"><strong id="linkedDeviceCount">1</strong><small>Current browser session</small></div>
+      <div class="settings-stat-card"><strong>Active</strong><small>Current device</small></div>
+    </div>
+    <div class="settings-list">
+      <div class="settings-control-row">
+        <div class="control-text"><strong>🖥️ This device</strong><small id="linkedDeviceInfo">Browser session</small></div>
+        <span class="settings-value">Active</span>
+      </div>
+      <div class="settings-note">ShaanChat can show and revoke server-managed sessions when a session-management backend is connected. This page currently tracks the local browser session safely without pretending to revoke Firebase sessions.</div>
+    </div>
+  </div>
+</div>
+  <div class="modal-card settings-card settings-page-card">
+    <div class="settings-stat"><div class="settings-stat-card"><strong>₹0</strong><small>Wallet balance</small></div><div class="settings-stat-card"><strong>0</strong><small>Transactions</small></div></div>
+    <div class="settings-list">
+      <button class="settings-item" id="paymentMethodsBtn"><span class="settings-icon">💳</span><span class="settings-item-text"><strong>Payment methods</strong><small>Manage UPI or payment methods</small></span><span class="settings-arrow">›</span></button>
+      <button class="settings-item" id="paymentHistoryBtn"><span class="settings-icon">🧾</span><span class="settings-item-text"><strong>Payment history</strong><small>View your ShaanChat transactions</small></span><span class="settings-arrow">›</span></button>
+      <div class="settings-note">Payment UI is ready, but real money movement requires a secure payment provider/backend. No fake transaction is created by this frontend.</div>
+    </div>
+  </div>
+</div>
+  <div class="modal-card settings-card settings-page-card">
+    <div class="settings-stat"><div class="settings-stat-card"><strong>Free</strong><small>Current plan</small></div><div class="settings-stat-card"><strong>Inactive</strong><small>Premium status</small></div></div>
+    <div class="settings-list">
+      <button class="settings-item" id="premiumBenefitsBtn"><span class="settings-icon">✨</span><span class="settings-item-text"><strong>Premium benefits</strong><small>AI, storage and advanced features</small></span><span class="settings-arrow">›</span></button>
+      <button class="settings-item" id="subscriptionPlansBtn"><span class="settings-icon">📦</span><span class="settings-item-text"><strong>Plans</strong><small>Choose a future premium plan</small></span><span class="settings-arrow">›</span></button>
+      <div class="settings-note">Subscription checkout is not faked here. Connect a verified payment/subscription backend before charging users.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Lists -->
+<div class="modal hidden" id="listsSettingsModal">
+  <div class="modal-card settings-card settings-page-card">
+    <div class="settings-head"><div><div class="modal-title">📋 Lists</div><div class="settings-subtitle">Manage your custom lists</div></div><button class="settings-close" id="closeListsSettings">✕</button></div>
+    <div class="modal-row"><input class="input" id="newListName" placeholder="New list name" maxlength="40"><button class="small-btn" id="addListBtn">Add</button></div>
+    <div class="settings-list" id="customListsBox" style="margin-top:10px"></div>
+  </div>
+</div>
+
+<!-- Chats -->
+<div class="modal hidden" id="chatsSettingsModal">
+  <div class="modal-card settings-card settings-page-card">
+    <div class="settings-head"><div><div class="modal-title">💬 Chats</div><div class="settings-subtitle">Chat history and message preferences</div></div><button class="settings-close" id="closeChatsSettings">✕</button></div>
+    <div class="settings-list">
+      <div class="settings-control-row"><div class="control-text"><strong>Enter is send</strong><small>Press Enter to send a message</small></div><button class="settings-toggle" id="chatEnterSendToggle"></button></div>
+      <div class="settings-control-row"><div class="control-text"><strong>Media visibility</strong><small>Show received media in the local media view</small></div><button class="settings-toggle" id="chatMediaVisibilityToggle"></button></div>
+      <div class="settings-control-row"><div class="control-text"><strong>Animated UI</strong><small>Enable interface transitions</small></div><button class="settings-toggle" id="chatAnimationToggle"></button></div>
+      <button class="settings-item" id="chatWallpaperBtn"><span class="settings-icon">🎨</span><span class="settings-item-text"><strong>Chat wallpaper</strong><small>Choose a local wallpaper style</small></span><span class="settings-arrow">›</span></button>
+      <button class="settings-item" id="chatHistoryInfoBtn"><span class="settings-icon">🗃️</span><span class="settings-item-text"><strong>Chat history</strong><small>Current chat messages are stored in Firebase</small></span><span class="settings-arrow">›</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- Notifications -->
+<div class="modal hidden" id="notifySettingsModal">
+  <div class="modal-card settings-card settings-page-card">
+    <div class="settings-head"><div><div class="modal-title">🔔 Notifications</div><div class="settings-subtitle">Control message alerts</div></div><button class="settings-close" id="closeNotifySettings">✕</button></div>
+    <div class="settings-list">
+      <div class="settings-control-row"><div class="control-text"><strong>Message notifications</strong><small>Allow ShaanChat to show message notifications</small></div><button class="settings-toggle" id="notifyMessageToggle"></button></div>
+      <div class="settings-control-row"><div class="control-text"><strong>Show previews</strong><small>Show message text in notifications</small></div><button class="settings-toggle" id="notifyPreviewToggle"></button></div>
+      <div class="settings-control-row"><div class="control-text"><strong>Notification sound</strong><small>Play a sound for incoming messages</small></div><button class="settings-toggle" id="notifySoundToggle"></button></div>
+      <button class="settings-item" id="enableBrowserNotificationsBtn"><span class="settings-icon">🔔</span><span class="settings-item-text"><strong>Enable browser notifications</strong><small>Request permission and register your device</small></span><span class="settings-arrow">›</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- Storage -->
+<div class="modal hidden" id="storageSettingsModal">
+  <div class="modal-card settings-card settings-page-card">
+    <div class="settings-head"><div><div class="modal-title">🗄️ Storage and data</div><div class="settings-subtitle">Manage media and local data</div></div><button class="settings-close" id="closeStorageSettings">✕</button></div>
+    <div class="settings-stat"><div class="settings-stat-card"><strong id="storageLocalSize">Calculating</strong><small>Local storage used</small></div><div class="settings-stat-card"><strong id="storageMessageCount">0</strong><small>Loaded messages</small></div></div>
+    <div class="settings-list">
+      <div class="settings-control-row"><div class="control-text"><strong>Auto-download images</strong><small>Allow received images to load automatically</small></div><button class="settings-toggle" id="storageImagesToggle"></button></div>
+      <div class="settings-control-row"><div class="control-text"><strong>Auto-download videos</strong><small>Allow received videos to load automatically</small></div><button class="settings-toggle" id="storageVideosToggle"></button></div>
+      <div class="settings-control-row"><div class="control-text"><strong>Data saver</strong><small>Prefer lower-data media behaviour</small></div><button class="settings-toggle" id="storageDataSaverToggle"></button></div>
+      <button class="settings-item settings-logout" id="clearLocalCacheBtn"><span class="settings-icon">🧹</span><span class="settings-item-text"><strong>Clear local cache</strong><small>Clear local UI preferences and temporary data only</small></span><span class="settings-arrow">›</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- Accessibility -->
+<div class="modal hidden" id="accessibilitySettingsModal">
+  <div class="modal-card settings-card settings-page-card">
+    <div class="settings-head"><div><div class="modal-title">♿ Accessibility</div><div class="settings-subtitle">Make ShaanChat easier to use</div></div><button class="settings-close" id="closeAccessibilitySettings">✕</button></div>
+    <div class="settings-list">
+      <div class="settings-control-row"><div class="control-text"><strong>Reduce motion</strong><small>Reduce interface animations</small></div><button class="settings-toggle" id="accessReduceMotionToggle"></button></div>
+      <div class="settings-control-row"><div class="control-text"><strong>Large text</strong><small>Increase common interface text sizes</small></div><button class="settings-toggle" id="accessLargeTextToggle"></button></div>
+      <div class="settings-control-row"><div class="control-text"><strong>High contrast</strong><small>Increase contrast for important controls</small></div><button class="settings-toggle" id="accessHighContrastToggle"></button></div>
+    </div>
+  </div>
+</div>
+
+<!-- Language -->
+<div class="modal hidden" id="languageSettingsModal">
+  <div class="modal-card settings-card settings-page-card">
+    <div class="settings-head"><div><div class="modal-title">🌐 App language</div><div class="settings-subtitle">Choose your interface language</div></div><button class="settings-close" id="closeLanguageSettings">✕</button></div>
+    <select class="settings-select" id="appLanguageSelect">
+      <option value="en">English</option><option value="hi">हिन्दी</option><option value="mr">मराठी</option><option value="ur">اردو</option>
+    </select>
+    <div class="settings-note" style="margin-top:10px">The selected language is saved now. Full translation of every existing screen can be added as the next localization layer.</div>
+  </div>
+</div>
+
+<!-- Help -->
+<div class="modal hidden" id="helpSettingsModal">
+  <div class="modal-card settings-card settings-page-card">
+    <div class="settings-head"><div><div class="modal-title">❓ Help</div><div class="settings-subtitle">ShaanChat support and information</div></div><button class="settings-close" id="closeHelpSettings">✕</button></div>
+    <div class="settings-list">
+      <button class="settings-item" id="helpFaqBtn"><span class="settings-icon">📚</span><span class="settings-item-text"><strong>FAQ</strong><small>Common questions about ShaanChat</small></span><span class="settings-arrow">›</span></button>
+      <button class="settings-item" id="helpContactBtn"><span class="settings-icon">✉️</span><span class="settings-item-text"><strong>Contact support</strong><small>Prepare a support email with your account details</small></span><span class="settings-arrow">›</span></button>
+      <button class="settings-item" id="helpAboutBtn"><span class="settings-icon">ℹ️</span><span class="settings-item-text"><strong>About ShaanChat</strong><small>Version, architecture and credits</small></span><span class="settings-arrow">›</span></button>
+    </div>
+  </div>
+</div>
+
 
 <div class="modal hidden" id="chatSecurityModal"><div class="modal-card settings-card"><div class="settings-head"><div><div class="modal-title" style="margin-bottom:4px">⚙️ Chat Settings</div><div class="settings-subtitle">Privacy & actions for this chat</div></div><button class="settings-close" id="closeChatSecurity">✕</button></div><div class="settings-list"><button class="settings-item" id="chatBlockAction"><span class="settings-icon">🚫</span><span class="settings-item-text"><strong id="chatBlockActionTitle">Block User</strong><small id="chatBlockActionSub">Stop this user from contacting you</small></span><span class="settings-arrow">›</span></button><button class="settings-item" id="chatReportAction"><span class="settings-icon">🚩</span><span class="settings-item-text"><strong>Report User</strong><small>Report spam, abuse or unwanted behaviour</small></span><span class="settings-arrow">›</span></button><button class="settings-item" id="chatLockAction"><span class="settings-icon">🔒</span><span class="settings-item-text"><strong id="chatLockActionTitle">Chat Lock</strong><small id="chatLockActionSub">Lock or unlock this conversation</small></span><span class="settings-arrow">›</span></button></div></div></div>
 
@@ -4526,6 +4890,296 @@ listenMessages= function(chatId){
 })();
 
 updatePrivateHeader();
+
+
+/* =========================================================
+   SHAANCHAT SETTINGS UPGRADE — WHATSAPP STYLE SETTINGS
+   Adds persistent settings pages without changing the chat schema.
+   ========================================================= */
+(function ShaanChatSettingsUpgrade(){
+  const q=id=>document.getElementById(id);
+  const safeJSON=(key,fallback={})=>{try{return JSON.parse(localStorage.getItem(key)||JSON.stringify(fallback))}catch(_){return fallback}};
+  const saveJSON=(key,val)=>localStorage.setItem(key,JSON.stringify(val));
+  const closeModal=id=>q(id)?.classList.add("hidden");
+  const openModal=id=>q(id)?.classList.remove("hidden");
+  const settingsKey="shaanchat.settings.v3";
+
+  const state=Object.assign({
+    chats:{enterSend:true,mediaVisibility:true,animation:true},
+    notifications:{messages:true,previews:true,sound:true},
+    storage:{images:true,videos:true,dataSaver:false},
+    accessibility:{reduceMotion:false,largeText:false,highContrast:false},
+    language:"en",
+    lists:[]
+  },safeJSON(settingsKey,{}));
+
+  function persist(){saveJSON(settingsKey,state);}
+
+  function setToggle(id,on){
+    const el=q(id); if(!el)return;
+    el.classList.toggle("on",!!on);
+    el.setAttribute("aria-pressed",!!on);
+  }
+  function bindToggle(id,get,set){
+    const el=q(id); if(!el)return;
+    setToggle(id,get());
+    el.onclick=()=>{set(!get());persist();setToggle(id,get());};
+  }
+
+  function settingsOpenPage(id){q("settingsModal")?.classList.add("hidden");openModal(id);}
+  function settingsBack(id){closeModal(id);openModal("settingsModal");}
+
+  /* Settings home */
+  q("linkedDevicesBtn")?.addEventListener("click",()=>{
+    settingsOpenPage("linkedDevicesModal");
+    const ua=navigator.userAgent||"";
+    q("linkedDeviceInfo").textContent=(/Android/i.test(ua)?"Android":/iPhone|iPad/i.test(ua)?"iPhone/iPad":/Windows/i.test(ua)?"Windows":/Mac/i.test(ua)?"Mac":"Browser")+" • Current session";
+  });
+  q("accountSettingsBtn")?.addEventListener("click",()=>{
+    settingsOpenPage("accountSettingsModal");
+    q("accountSettingsEmail").textContent=currentUser?.email||"Not available";
+    q("accountSettingsVerified").textContent=currentUser?.emailVerified?"✓ Email verified":"⚠ Email not verified";
+    q("accountSettingsVerified").style.color=currentUser?.emailVerified?"#48e6a1":"#f4c86a";
+  });
+  q("listsSettingsBtn")?.addEventListener("click",()=>{settingsOpenPage("listsSettingsModal");renderLists();});
+  q("chatsSettingsBtn")?.addEventListener("click",()=>{settingsOpenPage("chatsSettingsModal");syncPreferenceUI();});
+  q("notifySettingsBtn")?.addEventListener("click",()=>{settingsOpenPage("notifySettingsModal");syncPreferenceUI();});
+  q("storageSettingsBtn")?.addEventListener("click",()=>{settingsOpenPage("storageSettingsModal");syncPreferenceUI();updateStorageStats();});
+  q("accessibilitySettingsBtn")?.addEventListener("click",()=>{settingsOpenPage("accessibilitySettingsModal");syncPreferenceUI();});
+  q("languageSettingsBtn")?.addEventListener("click",()=>{settingsOpenPage("languageSettingsModal");syncPreferenceUI();});
+  q("helpSettingsBtn")?.addEventListener("click",()=>settingsOpenPage("helpSettingsModal"));
+  q("inviteSettingsBtn")?.addEventListener("click",async()=>{
+    const link=typeof getAppUrl==="function"?getAppUrl():location.href;
+    try{await navigator.clipboard.writeText(`Join me on ShaanChat: ${link}`);toastMsg("ShaanChat invite copied");}
+    catch(_){toastMsg(`Invite link: ${link}`);}
+  });
+
+  [
+    ["closeAccountSettings","accountSettingsModal"],["closeListsSettings","listsSettingsModal"],["closeChatsSettings","chatsSettingsModal"],
+    ["closeNotifySettings","notifySettingsModal"],["closeStorageSettings","storageSettingsModal"],["closeAccessibilitySettings","accessibilitySettingsModal"],
+    ["closeLanguageSettings","languageSettingsModal"],["closeHelpSettings","helpSettingsModal"]
+  ].forEach(([b,m])=>q(b)?.addEventListener("click",()=>settingsBack(m)));
+
+  /* Existing profile/group/QR handlers already close settings. */
+  q("privacySecurityBtn").onclick=async()=>{
+    q("settingsModal")?.classList.add("hidden");
+    await loadPrivacySettingsV3();
+    openModal("privacyModal");
+  };
+
+  /* Privacy state */
+  const privacyDefaults={
+    lastSeen:"everyone",onlineStatus:"everyone",profilePhoto:"everyone",about:"everyone",
+    links:"contacts",status:"contacts",readReceipts:true,defaultTimer:0,
+    groups:"everyone",liveLocation:"contacts",calls:"everyone"
+  };
+  let privacyState=Object.assign({},privacyDefaults);
+
+  function label(v){
+    return ({everyone:"Everyone",contacts:"My contacts",nobody:"Nobody"})[v]||v;
+  }
+  function timerLabel(v){
+    return ({0:"Off",86400:"24 hours",604800:"7 days",7776000:"90 days"})[Number(v)]||"Custom";
+  }
+  function refreshPrivacySummary(){
+    const map=[
+      ["privacyLastSeenSummary",privacyState.lastSeen],["privacyProfilePhotoSummary",privacyState.profilePhoto],
+      ["privacyAboutSummary",privacyState.about],["privacyLinksSummary",privacyState.links],
+      ["privacyStatusSummary",privacyState.status],["privacyGroupsSummary",privacyState.groups],
+      ["privacyLiveLocationSummary",privacyState.liveLocation],["privacyCallsSummary",privacyState.calls]
+    ];
+    map.forEach(([id,v])=>{if(q(id))q(id).textContent=label(v)});
+    if(q("privacyDefaultTimerSummary"))q("privacyDefaultTimerSummary").textContent=timerLabel(privacyState.defaultTimer);
+    setToggle("privacyReadReceiptsToggle",privacyState.readReceipts);
+  }
+  async function loadPrivacySettingsV3(){
+    try{
+      if(currentUser){
+        const s=await getDoc(doc(db,"users",currentUser.uid));
+        const p=s.data()?.privacy||{};
+        privacyState=Object.assign({},privacyDefaults,p);
+      }else privacyState=Object.assign({},privacyDefaults);
+    }catch(_){privacyState=Object.assign({},privacyDefaults);}
+    refreshPrivacySummary();
+  }
+  async function savePrivacySettingsV3(){
+    try{
+      if(!currentUser)return toastMsg("Please login again.");
+      await updateDoc(doc(db,"users",currentUser.uid),{
+        privacy:privacyState,updatedAt:serverTimestamp()
+      });
+      /* Keep existing privacy fields in sync with the original app. */
+      if(lastSeenPrivacy)lastSeenPrivacy.value=privacyState.lastSeen;
+      if(onlinePrivacy)onlinePrivacy.value=privacyState.onlineStatus;
+      toastMsg("Privacy settings saved");
+    }catch(e){toastMsg("Privacy save failed: "+(e?.message||e));}
+  }
+
+  function openPrivacySelector(title,key,choices){
+    q("privacySelectorTitle").textContent=title;
+    q("privacySelectorSub").textContent="Choose who can see this information";
+    const list=q("privacySelectorList"); list.innerHTML="";
+    choices.forEach(([value,text,desc])=>{
+      const b=document.createElement("button");b.className="settings-item";
+      b.innerHTML=`<span class="settings-icon">${value===privacyState[key]?"✓":"○"}</span><span class="settings-item-text"><strong>${esc(text)}</strong><small>${esc(desc||"")}</small></span><span class="settings-arrow">›</span>`;
+      b.onclick=()=>{privacyState[key]=value;refreshPrivacySummary();closeModal("privacySelectorModal");openModal("privacyModal");};
+      list.appendChild(b);
+    });
+    closeModal("privacyModal");openModal("privacySelectorModal");
+  }
+  const audience=[
+    ["everyone","Everyone","Anyone on ShaanChat"],
+    ["contacts","My contacts","People you have added"],
+    ["nobody","Nobody","No one can see it"]
+  ];
+  q("privacyLastSeenRow").onclick=()=>openPrivacySelector("Last seen and online","lastSeen",audience);
+  q("privacyProfilePhotoRow").onclick=()=>openPrivacySelector("Profile picture","profilePhoto",audience);
+  q("privacyAboutRow").onclick=()=>openPrivacySelector("About","about",audience);
+  q("privacyLinksRow").onclick=()=>openPrivacySelector("Links","links",audience);
+  q("privacyStatusRow").onclick=()=>openPrivacySelector("Status","status",audience);
+  q("privacyGroupsRow").onclick=()=>openPrivacySelector("Groups","groups",audience);
+  q("privacyLiveLocationRow").onclick=()=>openPrivacySelector("Live location","liveLocation",audience);
+  q("privacyCallsRow").onclick=()=>openPrivacySelector("Calls","calls",audience);
+
+  q("privacyDefaultTimerRow").onclick=()=>{
+    const choices=[
+      [0,"Off","Messages do not disappear by default"],
+      [86400,"24 hours","Messages disappear after 24 hours"],
+      [604800,"7 days","Messages disappear after 7 days"],
+      [7776000,"90 days","Messages disappear after 90 days"]
+    ];
+    q("privacySelectorTitle").textContent="Default message timer";
+    q("privacySelectorSub").textContent="Start new chats with disappearing messages";
+    const list=q("privacySelectorList");list.innerHTML="";
+    choices.forEach(([value,t,d])=>{
+      const b=document.createElement("button");b.className="settings-item";
+      b.innerHTML=`<span class="settings-icon">${Number(privacyState.defaultTimer)===value?"✓":"○"}</span><span class="settings-item-text"><strong>${esc(t)}</strong><small>${esc(d)}</small></span><span class="settings-arrow">›</span>`;
+      b.onclick=()=>{privacyState.defaultTimer=value;refreshPrivacySummary();closeModal("privacySelectorModal");openModal("privacyModal");};
+      list.appendChild(b);
+    });
+    closeModal("privacyModal");openModal("privacySelectorModal");
+  };
+
+  q("privacyReadReceiptsToggle").onclick=()=>{
+    privacyState.readReceipts=!privacyState.readReceipts;
+    refreshPrivacySummary();
+  };
+  q("closePrivacy")?.addEventListener("click",()=>closeModal("privacyModal"));
+  q("donePrivacy")?.addEventListener("click",()=>closeModal("privacyModal"));
+  q("savePrivacy")?.addEventListener("click",savePrivacySettingsV3);
+  q("closePrivacySelector")?.addEventListener("click",()=>{closeModal("privacySelectorModal");openModal("privacyModal");});
+
+  /* Account */
+  q("accountPasswordReset")?.addEventListener("click",()=>sendResetEmailVisible());
+  q("accountVerifyEmail")?.addEventListener("click",()=>resendVerification());
+  q("accountSecurityExisting")?.addEventListener("click",async()=>{closeModal("accountSettingsModal");await accountSecurity();});
+
+  /* Preferences */
+  function syncPreferenceUI(){
+    setToggle("chatEnterSendToggle",state.chats.enterSend);
+    setToggle("chatMediaVisibilityToggle",state.chats.mediaVisibility);
+    setToggle("chatAnimationToggle",state.chats.animation);
+    setToggle("notifyMessageToggle",state.notifications.messages);
+    setToggle("notifyPreviewToggle",state.notifications.previews);
+    setToggle("notifySoundToggle",state.notifications.sound);
+    setToggle("storageImagesToggle",state.storage.images);
+    setToggle("storageVideosToggle",state.storage.videos);
+    setToggle("storageDataSaverToggle",state.storage.dataSaver);
+    setToggle("accessReduceMotionToggle",state.accessibility.reduceMotion);
+    setToggle("accessLargeTextToggle",state.accessibility.largeText);
+    setToggle("accessHighContrastToggle",state.accessibility.highContrast);
+    q("appLanguageSelect").value=state.language||"en";
+    const names={en:"English",hi:"हिन्दी",mr:"मराठी",ur:"اردو"};
+    if(q("settingsLanguageValue"))q("settingsLanguageValue").textContent=names[state.language]||"English";
+    document.documentElement.classList.toggle("sc-large-text",!!state.accessibility.largeText);
+    document.documentElement.classList.toggle("sc-reduce-motion",!!state.accessibility.reduceMotion);
+    document.documentElement.classList.toggle("sc-high-contrast",!!state.accessibility.highContrast);
+  }
+
+  q("chatEnterSendToggle").onclick=()=>{state.chats.enterSend=!state.chats.enterSend;persist();syncPreferenceUI();};
+  q("chatMediaVisibilityToggle").onclick=()=>{state.chats.mediaVisibility=!state.chats.mediaVisibility;persist();syncPreferenceUI();};
+  q("chatAnimationToggle").onclick=()=>{state.chats.animation=!state.chats.animation;persist();syncPreferenceUI();};
+  q("notifyMessageToggle").onclick=()=>{state.notifications.messages=!state.notifications.messages;persist();syncPreferenceUI();};
+  q("notifyPreviewToggle").onclick=()=>{state.notifications.previews=!state.notifications.previews;persist();syncPreferenceUI();};
+  q("notifySoundToggle").onclick=()=>{state.notifications.sound=!state.notifications.sound;persist();syncPreferenceUI();};
+  q("storageImagesToggle").onclick=()=>{state.storage.images=!state.storage.images;persist();syncPreferenceUI();};
+  q("storageVideosToggle").onclick=()=>{state.storage.videos=!state.storage.videos;persist();syncPreferenceUI();};
+  q("storageDataSaverToggle").onclick=()=>{state.storage.dataSaver=!state.storage.dataSaver;persist();syncPreferenceUI();};
+  q("accessReduceMotionToggle").onclick=()=>{state.accessibility.reduceMotion=!state.accessibility.reduceMotion;persist();syncPreferenceUI();};
+  q("accessLargeTextToggle").onclick=()=>{state.accessibility.largeText=!state.accessibility.largeText;persist();syncPreferenceUI();};
+  q("accessHighContrastToggle").onclick=()=>{state.accessibility.highContrast=!state.accessibility.highContrast;persist();syncPreferenceUI();};
+
+  q("appLanguageSelect").onchange=()=>{state.language=q("appLanguageSelect").value;persist();syncPreferenceUI();toastMsg("Language preference saved");};
+  q("enableBrowserNotificationsBtn").onclick=()=>q("notifyBtn")?.click();
+
+  q("chatWallpaperBtn").onclick=()=>{
+    const choice=prompt("Chat wallpaper style: default / dots / plain","default");
+    if(choice===null)return;
+    state.chats.wallpaper=choice.trim().toLowerCase()||"default";persist();toastMsg("Chat wallpaper preference saved");
+  };
+  q("chatHistoryInfoBtn").onclick=()=>toastMsg("Chat messages are stored in your Firebase chat collection.");
+  q("paymentMethodsBtn").onclick=()=>toastMsg("Payment method screen ready for secure payment-provider integration.");
+  q("paymentHistoryBtn").onclick=()=>toastMsg("No payment transactions found.");
+  q("premiumBenefitsBtn").onclick=()=>toastMsg("Premium can include AI, extra storage, themes and advanced tools.");
+  q("subscriptionPlansBtn").onclick=()=>toastMsg("Premium plans can be connected after payment backend setup.");
+
+  function updateStorageStats(){
+    let bytes=0;
+    try{
+      for(let i=0;i<localStorage.length;i++){
+        const k=localStorage.key(i);bytes+=(k?.length||0)+(localStorage.getItem(k)?.length||0);
+      }
+    }catch(_){}
+    const kb=bytes/1024;
+    q("storageLocalSize").textContent=kb<1024?kb.toFixed(1)+" KB":(kb/1024).toFixed(2)+" MB";
+    q("storageMessageCount").textContent=String(Array.isArray(loadedMessages)?loadedMessages.length:0);
+  }
+  q("clearLocalCacheBtn").onclick=()=>{
+    if(!confirm("Clear local ShaanChat preferences and temporary cache? Your Firebase chats and account will not be deleted."))return;
+    [
+      "shaanchat.v2.ui","shaanTheme","shaanPeopleHidden","shaanLockedChats",
+      "shaanchat.settings.v3"
+    ].forEach(k=>localStorage.removeItem(k));
+    toastMsg("Local cache cleared. Reloading...");
+    setTimeout(()=>location.reload(),500);
+  };
+
+  /* Lists */
+  function renderLists(){
+    const box=q("customListsBox"); if(!box)return;
+    const lists=Array.isArray(state.lists)?state.lists:[];
+    box.innerHTML="";
+    if(!lists.length){box.innerHTML='<div class="settings-note">No custom lists yet. Create one above.</div>';return;}
+    lists.forEach((name,i)=>{
+      const row=document.createElement("div");row.className="settings-control-row";
+      row.innerHTML=`<div class="control-text"><strong>📋 ${esc(name)}</strong><small>Local list</small></div><button class="friend-btn danger" type="button">Delete</button>`;
+      row.querySelector("button").onclick=()=>{state.lists.splice(i,1);persist();renderLists();};
+      box.appendChild(row);
+    });
+  }
+  q("addListBtn").onclick=()=>{
+    const name=q("newListName").value.trim();
+    if(!name)return toastMsg("Enter a list name.");
+    if(!Array.isArray(state.lists))state.lists=[];
+    if(state.lists.some(x=>x.toLowerCase()===name.toLowerCase()))return toastMsg("List already exists.");
+    state.lists.push(name);q("newListName").value="";persist();renderLists();toastMsg("List created");
+  };
+
+  /* Help */
+  q("helpFaqBtn").onclick=()=>alert("ShaanChat FAQ\n\n• Use Settings to manage privacy and preferences.\n• QR Center lets friends add your profile.\n• App Lock protects the account on this device.\n• Chat media is stored using the configured storage backend.");
+  q("helpContactBtn").onclick=()=>{
+    const subject=encodeURIComponent("ShaanChat Support");
+    const body=encodeURIComponent(`Hello ShaanChat Support,\n\nAccount: ${currentUser?.email||"Not available"}\nPlease describe the issue here:\n`);
+    location.href=`mailto:support@shaanchat.app?subject=${subject}&body=${body}`;
+  };
+  q("helpAboutBtn").onclick=()=>alert("ShaanChat Pro\nAI-powered real-time messaging app.\n\nSettings Upgrade v3");
+
+  /* Close new pages when tapping backdrop */
+    q(id)?.addEventListener("click",e=>{if(e.target===q(id))closeModal(id);});
+  });
+
+  syncPreferenceUI();
+})();
 
 </script>
 
