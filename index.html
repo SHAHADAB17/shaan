@@ -5102,10 +5102,8 @@ updatePrivateHeader();
     state.chats.wallpaper=choice.trim().toLowerCase()||"default";persist();toastMsg("Chat wallpaper preference saved");
   };
   q("chatHistoryInfoBtn").onclick=()=>toastMsg("Chat messages are stored in your Firebase chat collection.");
-  q("paymentMethodsBtn").onclick=()=>toastMsg("Payment method screen ready for secure payment-provider integration.");
-  q("paymentHistoryBtn").onclick=()=>toastMsg("No payment transactions found.");
-  q("premiumBenefitsBtn").onclick=()=>toastMsg("Premium can include AI, extra storage, themes and advanced tools.");
-  q("subscriptionPlansBtn").onclick=()=>toastMsg("Premium plans can be connected after payment backend setup.");
+  /* Payment/subscription controls were intentionally removed from this build.
+     Do not bind handlers to elements that are not present in the DOM. */
 
   function updateStorageStats(){
     let bytes=0;
