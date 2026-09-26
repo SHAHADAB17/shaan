@@ -162,7 +162,7 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
 .media-viewer-title{max-width:90%;margin-top:12px;color:#fff;font-size:13px;font-weight:800;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .media-viewer-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:12px}
 .media-viewer-close{position:absolute;right:0;top:0;width:42px;height:42px;border:1px solid rgba(255,255,255,.18);border-radius:50%;background:#111927;color:#fff;font-size:20px;cursor:pointer;z-index:2}
-.media-viewer-close:hover{background:#1b2638}\n.media-open-btn{display:inline-flex;align-items:center;justify-content:center}
+.media-viewer-close:hover{background:#1b2638}.media-open-btn{display:inline-flex;align-items:center;justify-content:center}
 .media-viewer-pdf{width:min(92vw,900px);height:78vh;border:1px solid rgba(255,255,255,.14);border-radius:12px;background:#fff}
 @media(max-width:600px){
   .media-viewer{padding:10px}
@@ -381,6 +381,113 @@ button,input{font:inherit}.hidden{display:none!important}.btn{border:0;cursor:po
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+<style id="shaanchat-professional-polish">
+/* ===== ShaanChat Professional UI Polish ===== */
+:root{
+  --ui-radius:14px;
+  --ui-radius-lg:20px;
+  --ui-ease:cubic-bezier(.2,.8,.2,1);
+  --ui-glow:0 0 0 1px rgba(0,234,255,.08),0 16px 45px rgba(0,0,0,.22);
+}
+html{background:var(--bg);color-scheme:dark}
+body{
+  text-rendering:optimizeLegibility;
+  -webkit-font-smoothing:antialiased;
+  overscroll-behavior:none;
+}
+button,.small-btn,.icon-btn,.attach,.send,.qr-action,.friend-btn,.settings-close{
+  -webkit-tap-highlight-color:transparent;
+  transition:transform .16s var(--ui-ease),background .16s var(--ui-ease),border-color .16s var(--ui-ease),box-shadow .16s var(--ui-ease),opacity .16s var(--ui-ease);
+}
+button:not(:disabled):active,.small-btn:not(:disabled):active,.icon-btn:not(:disabled):active,.attach:not(:disabled):active,.send:not(:disabled):active{transform:translateY(1px) scale(.98)}
+button:disabled{cursor:not-allowed}
+.auth-box{
+  border-color:rgba(255,255,255,.12);
+  box-shadow:var(--ui-glow),0 30px 90px rgba(0,0,0,.38);
+}
+.auth-box .input{min-height:48px}
+.auth-main-btn{min-height:48px;box-shadow:0 10px 28px rgba(0,234,255,.12)}
+.auth-main-btn:hover{filter:brightness(1.06);box-shadow:0 14px 34px rgba(0,234,255,.18)}
+.sidebar{box-shadow:inset -1px 0 rgba(255,255,255,.02)}
+.sidebar-top{background:linear-gradient(180deg,rgba(255,255,255,.025),transparent)}
+.brand{letter-spacing:-.03em}
+.user{position:relative;min-height:70px;padding-block:12px;border-bottom-color:rgba(255,255,255,.055);transition:background .16s var(--ui-ease),transform .16s var(--ui-ease)}
+.user:hover{background:rgba(0,234,255,.055)}
+.user.active{background:linear-gradient(90deg,rgba(0,234,255,.11),rgba(124,60,255,.06));box-shadow:inset 3px 0 var(--cyan)}
+.user:focus-visible{z-index:2}
+.user-avatar,.chat-avatar,.avatar{box-shadow:0 0 0 1px rgba(255,255,255,.06);transition:box-shadow .16s var(--ui-ease),transform .16s var(--ui-ease)}
+.user:hover .user-avatar{transform:translateY(-1px);box-shadow:0 0 0 2px rgba(0,234,255,.16)}
+.chat-header{background:linear-gradient(180deg,rgba(13,20,33,.94),rgba(7,11,20,.84));backdrop-filter:blur(18px);position:relative;z-index:4}
+.chat-title{letter-spacing:-.015em}
+.chat-status{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.messages{scrollbar-gutter:stable;padding-inline:clamp(14px,2.2vw,24px)}
+.message-wrap{animation:messageIn .18s var(--ui-ease) both}
+@keyframes messageIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.message{box-shadow:0 5px 18px rgba(0,0,0,.10);border:1px solid rgba(255,255,255,.035)}
+.sent .message{box-shadow:0 7px 22px rgba(0,0,0,.16)}
+.message-actions{box-shadow:0 12px 30px rgba(0,0,0,.35)}
+.composer{padding:10px;gap:7px;background:linear-gradient(180deg,rgba(7,11,20,.76),rgba(7,11,20,.96));backdrop-filter:blur(18px);position:relative}
+.message-input{min-height:44px;resize:none;transition:border-color .16s var(--ui-ease),box-shadow .16s var(--ui-ease)}
+.message-input:focus{border-color:rgba(0,234,255,.65);box-shadow:0 0 0 3px rgba(0,234,255,.08)}
+.attach:hover,.icon-btn:hover{border-color:rgba(0,234,255,.28);color:#fff;background:#162235}
+.send{box-shadow:0 8px 20px rgba(0,234,255,.14)}
+.send:not(:disabled):hover{filter:brightness(1.05);box-shadow:0 10px 28px rgba(0,234,255,.2)}
+.modal-card,.call-card,.app-lock-card{box-shadow:var(--ui-glow),0 30px 100px rgba(0,0,0,.45)}
+.modal-title{letter-spacing:-.02em}
+.small-btn:hover,.qr-action:hover{border-color:rgba(0,234,255,.3);background:#162235;color:#fff}
+.toast,.sc-smart-toast{backdrop-filter:blur(16px)}
+
+/* Better scrollbars without affecting layout */
+.users,.messages,.check-list,.privacy-user-list,.sc-command-list{scrollbar-width:thin;scrollbar-color:rgba(132,144,165,.38) transparent}
+.users::-webkit-scrollbar,.messages::-webkit-scrollbar,.check-list::-webkit-scrollbar,.privacy-user-list::-webkit-scrollbar,.sc-command-list::-webkit-scrollbar{width:7px}
+.users::-webkit-scrollbar-thumb,.messages::-webkit-scrollbar-thumb,.check-list::-webkit-scrollbar-thumb,.privacy-user-list::-webkit-scrollbar-thumb,.sc-command-list::-webkit-scrollbar-thumb{background:rgba(132,144,165,.3);border-radius:99px}
+
+/* Command palette: one authoritative visibility state */
+#scCommandBackdrop.hidden{display:none!important}
+#scCommandBackdrop.show{display:flex!important}
+#scCommandInput{min-height:52px}
+
+/* Friend/chat metadata */
+.user[data-is-group="true"] .user-avatar{background:linear-gradient(135deg,rgba(124,60,255,.28),rgba(0,234,255,.16))}
+.sc-v2-unread{background:rgba(124,60,255,.07)}
+.sc-v2-pin{margin-left:auto;flex:0 0 auto;font-size:11px;opacity:.85}
+
+/* Safer mobile proportions */
+@media(max-width:800px){
+  .app{min-height:100dvh;height:100dvh}
+  .sidebar{height:100dvh}
+  .chat{height:100dvh}
+  .chat-header{min-height:64px;padding:9px 12px}
+  .messages{padding-block:14px}
+  .message-wrap{max-width:min(88%,520px)}
+  .composer{padding-bottom:max(10px,env(safe-area-inset-bottom))}
+  .message-input{min-height:42px}
+  .profile-actions{overflow:auto;padding-bottom:2px}
+  .profile-actions .small-btn{white-space:nowrap}
+}
+@media(max-width:480px){
+  .auth-screen{padding:14px}
+  .auth-box{padding:24px 18px;border-radius:20px}
+  .logo{font-size:28px}
+  .sidebar-top{padding:14px}
+  .user{padding-inline:14px}
+  .chat-tools .icon-btn{width:34px;height:34px}
+  .messages{padding-inline:10px}
+  .message-wrap{max-width:92%}
+  .chat-video{width:min(82vw,360px)}
+  .chat-pdf{width:82vw;max-width:82vw}
+}
+@media (prefers-reduced-motion:reduce){
+  .message-wrap{animation:none}
+  button,.small-btn,.icon-btn,.attach,.send{transition:none}
+}
+.theme-light{color-scheme:light}
+.theme-light .chat-header{background:rgba(255,255,255,.92)}
+.theme-light .composer{background:rgba(255,255,255,.94)}
+.theme-light .user.active{background:linear-gradient(90deg,rgba(0,169,189,.10),rgba(124,60,255,.05))}
+.theme-light .message{box-shadow:0 5px 18px rgba(20,32,51,.07)}
+</style>
 </head>
 <body>
 
@@ -913,6 +1020,8 @@ const activeCallAvatar=$("activeCallAvatar"),audioCallLabel=$("audioCallLabel"),
 const remoteVideo=$("remoteVideo"),localVideo=$("localVideo"),muteCallBtn=$("muteCallBtn"),cameraCallBtn=$("cameraCallBtn"),speakerCallBtn=$("speakerCallBtn"),flipCameraBtn=$("flipCameraBtn"),endCallBtn=$("endCallBtn"),incomingCallRinging=$("incomingCallRinging");
 
 let isRegister=false,currentUser=null,selectedUser=null,selectedChat=null,unsubscribeMessages=null,unsubscribeChat=null,unsubscribeTyping=null;
+// Read-only bridge for independent UI enhancement modules. Keeps selectedUser authoritative here.
+Object.defineProperty(window,"ShaanChatState",{configurable:true,value:{getSelectedUser:()=>selectedUser,getCurrentUser:()=>currentUser}});
 let allUsers=[],loadedMessages=[],replyingTo=null,typingTimer=null,mediaRecorder=null,voiceChunks=[],isRecording=false;
 let myProfileData={},myFriends=new Set(),incomingFriendRequests=[],outgoingFriendRequests=[];
 let unsubscribeMyProfile=null,unsubscribeIncomingFriendRequests=null,unsubscribeOutgoingFriendRequests=null;
@@ -1413,6 +1522,9 @@ function renderUsers(users){
 function renderFriendListUser(user){
   const div=document.createElement("div");
   div.className="user";
+  div.dataset.uid=user.id||user.uid||"";
+  div.dataset.isGroup=user.isGroup?"true":"false";
+  div.dataset.name=user.name||user.username||"";
   const online=!!user.online;
   div.innerHTML=`<div class="user-avatar"></div><div class="user-info">
     <div class="user-name">${esc(user.name||"User")}</div>
@@ -1482,6 +1594,9 @@ function renderOutgoingRequest(req){
 function renderUser(user){
   const div=document.createElement("div");
   div.className="user";
+  div.dataset.uid=user.id||user.uid||"";
+  div.dataset.isGroup=user.isGroup?"true":"false";
+  div.dataset.name=user.name||user.username||"";
   if(user.isGroup)div.dataset.groupId=user.id;
   const online=user.isGroup?true:!!user.online;
   const friend=isFriend(user.id);
@@ -4224,8 +4339,8 @@ listenMessages= function(chatId){
   const store=getStore();
   const save=()=>localStorage.setItem(KEY,JSON.stringify(store));
   const q=id=>document.getElementById(id);
-  const selectedId=()=>window.selectedUser?.id||window.selectedUser?.uid||"";
-  const chatKey=()=>window.selectedUser?.isGroup ? "group:"+selectedId() : "user:"+selectedId();
+  const selectedId=()=>window.ShaanChatState?.getSelectedUser?.()?.id||window.ShaanChatState?.getSelectedUser?.()?.uid||"";
+  const chatKey=()=>window.ShaanChatState?.getSelectedUser?.()?.isGroup ? "group:"+selectedId() : "user:"+selectedId();
 
   function ensureStore(){
     store.pinned=store.pinned||{};
@@ -4585,7 +4700,11 @@ updatePrivateHeader();
     renderCommands("");
     setTimeout(()=>cmdInput.focus(),40);
   }
-  function closeCommandPalette(){cmdBackdrop?.classList.remove("show");}
+  function closeCommandPalette(){
+    if(!cmdBackdrop)return;
+    cmdBackdrop.classList.remove("show");
+    cmdBackdrop.classList.add("hidden");
+  }
 
   function buildCommands(){
     commands=[
