@@ -440,18 +440,10 @@ button:disabled{cursor:not-allowed}
 
 /* Better scrollbars without affecting layout */
 .users,.messages,.check-list,.privacy-user-list,.sc-command-list{scrollbar-width:thin;scrollbar-color:rgba(132,144,165,.38) transparent}
-.users::-webkit-scrollbar,.messages::-webkit-scrollbar,.check-list::-webkit-scrollbar,.privacy-user-list::-webkit-scrollbar,.sc-command-list::-webkit-scrollbar{width:7px}
-.users::-webkit-scrollbar-thumb,.messages::-webkit-scrollbar-thumb,.check-list::-webkit-scrollbar-thumb,.privacy-user-list::-webkit-scrollbar-thumb,.sc-command-list::-webkit-scrollbar-thumb{background:rgba(132,144,165,.3);border-radius:99px}
+.users::-webkit-scrollbar,.messages::-webkit-scrollbar,.check-list::-webkit-scrollbar,.privacy-user-list::-webkit-scrollbar
+.users::-webkit-scrollbar-thumb,.messages::-webkit-scrollbar-thumb,.check-list::-webkit-scrollbar-thumb,.privacy-user-list::-webkit-scrollbar-thumb
 
-/* Command palette: one authoritative visibility state */
-#scCommandBackdrop.hidden{display:none!important}
-#scCommandBackdrop.show{display:flex!important}
-#scCommandInput{min-height:52px}
 
-/* Friend/chat metadata */
-.user[data-is-group="true"] .user-avatar{background:linear-gradient(135deg,rgba(124,60,255,.28),rgba(0,234,255,.16))}
-.sc-v2-unread{background:rgba(124,60,255,.07)}
-.sc-v2-pin{margin-left:auto;flex:0 0 auto;font-size:11px;opacity:.85}
 
 /* Safer mobile proportions */
 @media(max-width:800px){
@@ -521,14 +513,6 @@ button:disabled{cursor:not-allowed}
         <button class="small-btn settings-main-btn" id="settingsBtn">⚙️ Settings</button>
       </div>
       <input class="search" id="searchUsers" placeholder="Search people by name or @username...">
-<div class="sc-pro-topbar" id="scProFilters">
-  <button class="sc-pro-filter active" data-filter="all">All</button>
-  <button class="sc-pro-filter" data-filter="unread">Unread <span class="badge" id="scUnreadBadge">0</span></button>
-  <button class="sc-pro-filter" data-filter="favourites">⭐</button>
-  <button class="sc-pro-filter" data-filter="groups">👥</button>
-  <button class="sc-pro-filter" data-filter="archived">🗂️</button>
-  <span class="sc-online-pill" id="scOnlinePill">● Online</span>
-</div>
 
     </div>
     <div class="users" id="usersList"></div>
@@ -594,11 +578,7 @@ button:disabled{cursor:not-allowed}
         <span class="chat-setting-icon">⭐</span><strong id="chatSettingFavouriteTitle">Favourite Chat</strong>
         <small id="chatSettingFavouriteDesc">Add this chat to favourites</small><div class="chat-setting-status" id="chatSettingFavouriteStatus"></div>
       </button>
-      <button class="chat-setting-card primary-chat-setting" id="chatSettingMore" type="button">
-        <span class="chat-setting-icon">⋮</span><strong>More Chat Options</strong>
-        <small>Focus, draft, chat ID, shortcuts and export</small>
-      </button>
-      <button class="chat-setting-card primary-chat-setting" id="chatSettingSearch" type="button">
+<button class="chat-setting-card primary-chat-setting" id="chatSettingSearch" type="button">
         <span class="chat-setting-icon">🔎</span><strong>Search Messages</strong>
         <small>Search and highlight messages in this chat</small>
       </button>
@@ -670,7 +650,7 @@ button:disabled{cursor:not-allowed}
       </button>
 
       <button class="settings-item" id="privacySecurityBtn"><span class="settings-icon">🔐</span><span class="settings-item-text"><strong>Privacy & Security</strong><small>Blocking, privacy, chat lock & account security</small></span><span class="settings-arrow">›</span></button>
-      <button class="settings-item" id="scHeaderActionsBtn"><span class="settings-icon">⚙️</span><span class="settings-item-text"><strong>Chat Settings</strong><small>Favourite, More, Search, privacy and conversation controls</small></span><span class="settings-arrow">›</span></button>
+      <button class="settings-item" id="scHeaderActionsBtn"><span class="settings-icon">⚙️</span><span class="settings-item-text"><strong>Chat Settings</strong><small>Favourite, Search, privacy and conversation controls</small></span><span class="settings-arrow">›</span></button>
       <div class="settings-divider"></div>
 
       
@@ -1020,8 +1000,9 @@ const activeCallAvatar=$("activeCallAvatar"),audioCallLabel=$("audioCallLabel"),
 const remoteVideo=$("remoteVideo"),localVideo=$("localVideo"),muteCallBtn=$("muteCallBtn"),cameraCallBtn=$("cameraCallBtn"),speakerCallBtn=$("speakerCallBtn"),flipCameraBtn=$("flipCameraBtn"),endCallBtn=$("endCallBtn"),incomingCallRinging=$("incomingCallRinging");
 
 let isRegister=false,currentUser=null,selectedUser=null,selectedChat=null,unsubscribeMessages=null,unsubscribeChat=null,unsubscribeTyping=null;
+let sendingMessage=false;
 // Read-only bridge for independent UI enhancement modules. Keeps selectedUser authoritative here.
-Object.defineProperty(window,"ShaanChatState",{configurable:true,value:{getSelectedUser:()=>selectedUser,getCurrentUser:()=>currentUser}});
+Object.defineProperty(window,"ShaanChatState",{configurable:true,value:{getSelectedUser:()=>selectedUser,getCurrentUser:()=>currentUser,refreshUsers:()=>renderUsers(allUsers)}});
 let allUsers=[],loadedMessages=[],replyingTo=null,typingTimer=null,mediaRecorder=null,voiceChunks=[],isRecording=false;
 let myProfileData={},myFriends=new Set(),incomingFriendRequests=[],outgoingFriendRequests=[];
 let unsubscribeMyProfile=null,unsubscribeIncomingFriendRequests=null,unsubscribeOutgoingFriendRequests=null;
@@ -1412,7 +1393,6 @@ async function setPresence(online){
 }
 setInterval(()=>{if(currentUser&&!document.hidden)setPresence(true)},30000);
 document.addEventListener("visibilitychange",async()=>{if(currentUser)setPresence(!document.hidden);if(currentUser&&!document.hidden){appLockChecked=false;await showAppLockIfEnabled()}});
-window.addEventListener("beforeunload",()=>{if(currentUser)navigator.sendBeacon&&navigator.sendBeacon(location.href,"")});
 
 function listenUsers(){
   const q=query(collection(db,"users"));
@@ -2300,11 +2280,17 @@ function startReply(d){replyingTo=d;replyText.textContent="Replying to: "+(d.tex
 cancelReply.onclick=()=>{replyingTo=null;replyBar.classList.add("hidden")}
 async function sendMessage(textOverride=null){
   const text=(textOverride??messageInput.value).trim();
-  if(!text||!selectedUser||!currentUser)return;
+  if(!text||!selectedUser||!currentUser||sendingMessage)return;
   if(!selectedUser.isGroup && !isFriend(selectedUser.id)){
     toastMsg("Add this person as a friend before messaging.");
     return;
   }
+  if(!selectedUser.isGroup && (myProfileData?.blockedUsers||[]).includes(selectedUser.id)){
+    toastMsg("Unblock this user before sending messages.");
+    return;
+  }
+  sendingMessage=true;
+  sendBtn.disabled=true;
 
   const chatId=getChatId(selectedUser);
   const participants=selectedUser.isGroup
@@ -2351,6 +2337,9 @@ async function sendMessage(textOverride=null){
   }catch(e){
     console.error("Message send error:",e);
     toastMsg("Message failed: "+(e?.message||"Unknown Firebase error"));
+  }finally{
+    sendingMessage=false;
+    sendBtn.disabled=!messageInput.value.trim() || !selectedUser;
   }
 }
 sendBtn.onclick=()=>sendMessage();
@@ -3447,6 +3436,18 @@ if ("serviceWorker" in navigator) {
   const SC_KEY="shaanchat.pro.2026";
   const state=JSON.parse(localStorage.getItem(SC_KEY)||"{}");
   const saveState=()=>localStorage.setItem(SC_KEY,JSON.stringify(state));
+  function toggleFavourite(){
+    const key=selectedChat?.id||selectedUser?.id||"none";
+    if(key==="none") return toast("Select a chat first");
+    state.favourites=Array.isArray(state.favourites)?state.favourites:[];
+    const index=state.favourites.indexOf(key);
+    if(index>=0){ state.favourites.splice(index,1); toast("Removed from favourites"); }
+    else { state.favourites.push(key); toast("Chat added to favourites"); }
+    saveState();
+    window.scRefreshFavourite?.();
+    window.ShaanChatState?.refreshUsers?.();
+  }
+  window.toggleFavourite=toggleFavourite;
   const q=id=>document.getElementById(id);
   const root=document.documentElement;
   const body=document.body;
@@ -3720,7 +3721,6 @@ body.sc-reduced-motion *,body.sc-reduced-motion *::before,body.sc-reduced-motion
   shortcutBackdrop.innerHTML=`
     <div class="sc-shortcuts">
       <h3>⌨️ ShaanChat shortcuts</h3>
-      <div class="sc-key-row"><span>Command palette</span><kbd>Ctrl / ⌘ + K</kbd></div>
       <div class="sc-key-row"><span>Focus composer</span><kbd>M</kbd></div>
       <div class="sc-key-row"><span>Search current chat</span><kbd>Ctrl / ⌘ + F</kbd></div>
       <div class="sc-key-row"><span>Message reactions</span><kbd>Long press</kbd></div>
@@ -3982,16 +3982,6 @@ body.sc-reduced-motion *,body.sc-reduced-motion *::before,body.sc-reduced-motion
   q("chatSettingPrivate")?.addEventListener("click",()=>{if(!requireChatForSettings()||selectedUser?.isGroup)return;q("scHeaderActionsModal")?.classList.add("hidden");q("privateChatBtn")?.click()});
   q("chatSettingSecurity")?.addEventListener("click",()=>{if(!requireChatForSettings()||selectedUser?.isGroup)return;q("scHeaderActionsModal")?.classList.add("hidden");openChatSecurity()});
   q("chatSettingGroup")?.addEventListener("click",()=>{if(!requireChatForSettings()||!selectedUser?.isGroup)return;q("scHeaderActionsModal")?.classList.add("hidden");q("groupSettingsBtn")?.click()});
-  q("chatSettingMore")?.addEventListener("click",()=>{
-    if(!requireChatForSettings())return;
-    const id=selectedChat?.id||selectedUser?.id||"";
-    const choice=prompt("More Chat Options:\n1 = Focus mode\n2 = Clear draft\n3 = Copy chat ID\n4 = Keyboard shortcuts\n5 = Export visible messages", "");
-    if(choice==="1")toggleFocusMode();
-    else if(choice==="2"){localStorage.removeItem(draftKey());if(input){input.value=""}if(draftNote)draftNote.classList.remove("show");toast("Draft cleared")}
-    else if(choice==="3"){if(!id)return toast("Chat ID unavailable");navigator.clipboard?.writeText(id).then(()=>toast("Chat ID copied")).catch(()=>toast("Clipboard unavailable"))}
-    else if(choice==="4")openShortcuts();
-    else if(choice==="5")exportVisibleMessages();
-  });
   q("scHeaderActionsModal")?.addEventListener("click",e=>{if(e.target===q("scHeaderActionsModal"))q("scHeaderActionsModal").classList.add("hidden")});
   window.scRefreshFavourite=updateChatSettingsCard;
   window.scRefreshChatSettings=()=>{applyHeaderActionVisibility();updateChatSettingsCard()};
@@ -4004,17 +3994,6 @@ body.sc-reduced-motion *,body.sc-reduced-motion *::before,body.sc-reduced-motion
     return true
   }
   function closeMainSettings(){q("settingsModal")?.classList.add("hidden")}
-  q("scSettingFavourite")?.addEventListener("click",()=>{if(!requireChat())return;toggleFavourite();});
-  q("scSettingSearch")?.addEventListener("click",()=>{if(!requireChat())return;closeMainSettings();q("searchMessagesBtn")?.click()});
-  q("scSettingVoice")?.addEventListener("click",()=>{if(!requireChat())return;closeMainSettings();q("voiceCallBtn")?.click()});
-  q("scSettingVideo")?.addEventListener("click",()=>{if(!requireChat())return;closeMainSettings();q("videoCallBtn")?.click()});
-  q("scSettingSecurity")?.addEventListener("click",()=>{if(!requireChat())return;closeMainSettings();q("chatSecurityBtn")?.click()});
-  q("scSettingPrivate")?.addEventListener("click",()=>{if(!requireChat())return;closeMainSettings();q("privateChatBtn")?.click()});
-  q("scSettingGroup")?.addEventListener("click",()=>{if(!requireChat())return;closeMainSettings();q("groupSettingsBtn")?.click()});
-  q("scSettingBlock")?.addEventListener("click",()=>{if(!requireChat())return;closeMainSettings();q("blockUserBtn")?.click()});
-  q("scSettingFocus")?.addEventListener("click",()=>{if(!requireChat())return;toggleFocusMode()});
-  q("scSettingClearDraft")?.addEventListener("click",()=>{if(!requireChat())return;localStorage.removeItem(draftKey());if(input){input.value=""}if(draftNote)draftNote.classList.remove("show");toast("Draft cleared")});
-  q("scSettingExport")?.addEventListener("click",()=>{if(!requireChat())return;exportVisibleMessages()});
 
   function refreshChatSettingsAvailability(){
     const person=!!selectedUser&&!selectedUser.isGroup;
@@ -4120,9 +4099,9 @@ body.sc-reduced-motion *,body.sc-reduced-motion *::before,body.sc-reduced-motion
   window.exportVisibleMessages=exportVisibleMessages;
 
   /* ---------- profile / privacy micro UX ---------- */
-  const profileModal=q("profileModal");
-  if(profileModal){
-    const title=profileModal.querySelector(".modal-title");
+  const uxProfileModal=q("profileModal");
+  if(uxProfileModal){
+    const title=uxProfileModal.querySelector(".modal-title");
     if(title)title.innerHTML="👤 Your profile <span style='font-size:10px;color:#48e6a1;margin-left:5px'>● synced</span>";
   }
 
@@ -4216,7 +4195,6 @@ body.sc-reduced-motion *,body.sc-reduced-motion *::before,body.sc-reduced-motion
     state,
     saveState,
     toast,
-    openCommandPalette,
     openShortcuts,
     toggleFocusMode,
     exportVisibleMessages
@@ -4326,511 +4304,9 @@ listenMessages= function(chatId){
 };
 
 
-/* ============================================================
-   SHAANCHAT PRO V2 — CHAT ORGANIZATION + LOCAL UX
-   Safe layer: no Firestore schema changes.
-   Adds pin/mute/archive/unread/clear controls, chat search,
-   quick actions, keyboard shortcuts and persistent UI state.
-   ============================================================ */
-(function ShaanChatProV2(){
-  "use strict";
-  const KEY="shaanchat.v2.ui";
-  const getStore=()=>{try{return JSON.parse(localStorage.getItem(KEY)||"{}")}catch(_){return {}}};
-  const store=getStore();
-  const save=()=>localStorage.setItem(KEY,JSON.stringify(store));
-  const q=id=>document.getElementById(id);
-  const selectedId=()=>window.ShaanChatState?.getSelectedUser?.()?.id||window.ShaanChatState?.getSelectedUser?.()?.uid||"";
-  const chatKey=()=>window.ShaanChatState?.getSelectedUser?.()?.isGroup ? "group:"+selectedId() : "user:"+selectedId();
-
-  function ensureStore(){
-    store.pinned=store.pinned||{};
-    store.muted=store.muted||{};
-    store.archived=store.archived||{};
-    store.unread=store.unread||{};
-    store.drafts=store.drafts||{};
-    store.favourites=store.favourites||{};
-    save();
-  }
-  ensureStore();
-
-  const oldToast=window.toastMsg;
-  function notify(t){
-    try{ if(typeof oldToast==="function") oldToast(t); else console.log(t); }catch(_){console.log(t)}
-  }
-
-  function current(){return chatKey() || "";}
-  function toggleMap(name,label){
-    const k=current(); if(!k)return notify("Open a chat first.");
-    store[name][k]=!store[name][k]; save(); render();
-    notify((store[name][k]?"✓ ":"") + label + (store[name][k]?" enabled":" disabled"));
-  }
-  function clearCurrent(){
-    const k=current(); if(!k)return notify("Open a chat first.");
-    if(!confirm("Clear this chat from this device view? Firestore messages are not deleted."))return;
-    store.cleared=store.cleared||{}; store.cleared[k]=Date.now(); save();
-    if(q("messages")) q("messages").innerHTML='<div class="empty">Chat view cleared on this device. New messages will appear here.</div>';
-    notify("Chat view cleared");
-  }
-  function markUnread(){
-    const k=current(); if(!k)return notify("Open a chat first.");
-    store.unread[k]=true; save(); render(); notify("Marked as unread");
-  }
-  function markRead(){
-    const k=current(); if(!k)return;
-    delete store.unread[k]; save(); render();
-  }
-
-  function getName(u){
-    return u?.name || u?.displayName || u?.username || "Chat";
-  }
-
-  function render(){
-    document.querySelectorAll(".user").forEach(el=>{
-      const id=el.dataset.uid || el.getAttribute("data-user-id") || "";
-      if(!id)return;
-      const k=(el.dataset.isGroup==="true"?"group:":"user:")+id;
-      el.classList.toggle("sc-v2-muted",!!store.muted[k]);
-      el.classList.toggle("sc-v2-unread",!!store.unread[k]);
-      let badge=el.querySelector(".sc-v2-pin");
-      if(store.pinned[k]){
-        if(!badge){badge=document.createElement("span");badge.className="sc-v2-pin";badge.textContent="📌";(el.querySelector(".user-info")||el).appendChild(badge)}
-      }else if(badge)badge.remove();
-    });
-    const k=current();
-    const fav=q("chatSettingFavouriteStatus");
-    if(fav) fav.textContent=store.favourites[k]?"★ Favourite":"";
-  }
-
-  function openSheet(){
-    if(!selectedId())return notify("Open a chat first.");
-    let b=document.getElementById("scV2Actions");
-    if(b)b.remove();
-    b=document.createElement("div"); b.id="scV2Actions"; b.className="sc-v2-backdrop";
-    const k=current(), s=store;
-    b.innerHTML=`
-      <div class="sc-v2-sheet" role="dialog" aria-label="More chat options">
-        <div class="sc-v2-head"><strong>⋮ More Chat Options</strong><button class="sc-v2-close">✕</button></div>
-        <div class="sc-v2-grid">
-          <button class="sc-v2-item" data-a="pin"><span class="ico">📌</span><span><strong>${s.pinned[k]?"Unpin":"Pin"} Chat</strong><small>Keep this conversation at the top</small></span></button>
-          <button class="sc-v2-item" data-a="mute"><span class="ico">🔕</span><span><strong>${s.muted[k]?"Unmute":"Mute"} Chat</strong><small>Control chat notification noise</small></span></button>
-          <button class="sc-v2-item" data-a="fav"><span class="ico">⭐</span><span><strong>${s.favourites[k]?"Remove Favourite":"Favourite Chat"}</strong><small>Quick access to important chats</small></span></button>
-          <button class="sc-v2-item" data-a="unread"><span class="ico">🔴</span><span><strong>Mark Unread</strong><small>Keep this chat highlighted</small></span></button>
-          <button class="sc-v2-item" data-a="search"><span class="ico">🔎</span><span><strong>Search Messages</strong><small>Find text in the current chat</small></span></button>
-          <button class="sc-v2-item" data-a="draft"><span class="ico">📝</span><span><strong>Save Draft</strong><small>Save the current composer text</small></span></button>
-          <button class="sc-v2-item" data-a="lock"><span class="ico">🔒</span><span><strong>Chat Lock</strong><small>Use the existing security controls</small></span></button>
-          <button class="sc-v2-item danger" data-a="clear"><span class="ico">🗑️</span><span><strong>Clear Chat View</strong><small>Local view only; does not delete server data</small></span></button>
-        </div>
-      </div>`;
-    document.body.appendChild(b);
-    b.querySelector(".sc-v2-close").onclick=()=>b.remove();
-    b.onclick=e=>{if(e.target===b)b.remove()};
-    b.querySelectorAll("[data-a]").forEach(btn=>btn.onclick=()=>{
-      const a=btn.dataset.a;
-      if(a==="pin")toggleMap("pinned","Pin Chat");
-      if(a==="mute")toggleMap("muted","Mute Chat");
-      if(a==="fav")toggleMap("favourites","Favourite");
-      if(a==="unread")markUnread();
-      if(a==="search")q("searchMessagesBtn")?.click();
-      if(a==="lock")q("chatLockAction")?.click();
-      if(a==="clear")clearCurrent();
-      if(a==="draft"){
-        const text=q("messageInput")?.value||"";
-        store.drafts[current()]=text;save();notify(text?"Draft saved":"Empty draft saved");
-      }
-      b.remove();
-    });
-  }
-
-  function addQuickTools(){
-    const header=q("chatSettingsGrid");
-    if(!header || document.getElementById("scV2ExtraTools"))return;
-    const wrap=document.createElement("div");
-    wrap.id="scV2ExtraTools";
-    wrap.style.cssText="grid-column:1/-1;display:flex;gap:7px;overflow:auto;padding-top:3px";
-    wrap.innerHTML=`
-      <button class="sc-v2-mini" data-v2="pin">📌 Pin</button>
-      <button class="sc-v2-mini" data-v2="mute">🔕 Mute</button>
-      <button class="sc-v2-mini" data-v2="archive">🗂️ Archive</button>
-      <button class="sc-v2-mini" data-v2="unread">🔴 Unread</button>
-      <button class="sc-v2-mini" data-v2="more">⋮ More</button>`;
-    header.appendChild(wrap);
-    wrap.querySelectorAll("[data-v2]").forEach(x=>x.onclick=()=>{
-      const a=x.dataset.v2;
-      if(a==="pin")toggleMap("pinned","Pin Chat");
-      if(a==="mute")toggleMap("muted","Mute Chat");
-      if(a==="archive")toggleMap("archived","Archive");
-      if(a==="unread")markUnread();
-      if(a==="more")openSheet();
-    });
-  }
-
-  // Intercept the existing "More Chat Options" card without replacing its UI.
-  document.addEventListener("click",e=>{
-    const more=e.target.closest("#chatSettingMore");
-    if(more){e.preventDefault();e.stopImmediatePropagation();openSheet();}
-  },true);
-
-  // Save/restore drafts.
-  document.addEventListener("focusin",e=>{
-    if(e.target?.id!=="messageInput")return;
-    const k=current(); if(!k)return;
-    if(!e.target.value && store.drafts[k])e.target.value=store.drafts[k];
-  });
-  document.addEventListener("input",e=>{
-    if(e.target?.id!=="messageInput")return;
-    const k=current(); if(!k)return;
-    store.drafts[k]=e.target.value; save();
-  });
-
-  // Keyboard shortcuts, matching the existing command-palette philosophy.
-  document.addEventListener("keydown",e=>{
-    if(e.target?.matches("input,textarea,[contenteditable='true']"))return;
-    if(e.ctrlKey||e.metaKey)return;
-    const k=e.key.toLowerCase();
-    if(k==="f" && selectedId()){e.preventDefault();toggleMap("favourites","Favourite");}
-    if(k==="l" && selectedId())q("chatLockAction")?.click();
-    if(k==="s" && selectedId())q("searchMessagesBtn")?.click();
-    if(k==="m" && selectedId()){e.preventDefault();q("messageInput")?.focus();}
-  });
-
-  // Clear local unread when a chat is opened; preserve existing openChat behaviour.
-  if(typeof window.openChat==="function"){
-    const _open=window.openChat;
-    window.openChat=async function(...args){
-      const r=await _open.apply(this,args);
-      const u=args[0], id=u?.id||u?.uid;
-      if(id){delete store.unread[(u?.isGroup?"group:":"user:")+id];save();}
-      setTimeout(render,50);
-      return r;
-    };
-  }
-
-  // Periodic refresh is intentionally light.
-  setInterval(()=>{addQuickTools();render()},1500);
-  setTimeout(()=>{addQuickTools();render()},500);
-
-  window.ShaanChatV2={
-    openMoreChatOptions:openSheet,
-    pinChat:()=>toggleMap("pinned","Pin Chat"),
-    muteChat:()=>toggleMap("muted","Mute Chat"),
-    archiveChat:()=>toggleMap("archived","Archive"),
-    markUnread,
-    clearChatView:clearCurrent
-  };
-})();
 
 updatePrivateHeader();
 
-</script>
-
-<div class="sc-new-message" id="scNewMessage">New message · tap to open</div>
-<div class="sc-network" id="scNetwork"></div>
-
-<div class="sc-command-backdrop hidden" id="scCommandBackdrop">
-  <div class="sc-command" role="dialog" aria-label="ShaanChat command palette">
-    <input id="scCommandInput" placeholder="Search commands…">
-    <div class="sc-command-list" id="scCommandList"></div>
-  </div>
-</div>
-
-<div class="modal hidden" id="scHelpModal">
-  <div class="modal-card">
-    <div class="modal-title">⌨️ ShaanChat Shortcuts</div>
-    <div class="sc-help-grid">
-      <div class="sc-help-row"><kbd>Ctrl / ⌘ + K</kbd><br>Open command palette</div>
-      <div class="sc-help-row"><kbd>Esc</kbd><br>Close current dialog</div>
-      <div class="sc-help-row"><kbd>F</kbd><br>Favourite selected chat</div>
-      <div class="sc-help-row"><kbd>S</kbd><br>Search messages</div>
-      <div class="sc-help-row"><kbd>M</kbd><br>Focus message box</div>
-      <div class="sc-help-row"><kbd>L</kbd><br>Chat lock</div>
-    </div>
-    <div class="modal-actions"><button class="small-btn" data-close="scHelpModal">Done</button></div>
-  </div>
-</div>
-
-
-<script type="module">
-/* =========================================================
-   SHAANCHAT ONE-FILE PRO ENGINE
-   UI state, chat filters, command palette, network UX,
-   accessibility helpers and safe persistence.
-   This layer intentionally does not replace Firebase logic.
-   ========================================================= */
-(() => {
-  "use strict";
-
-  const $ = id => document.getElementById(id);
-  const root = document.documentElement;
-  const app = $("app");
-  const users = $("usersList");
-  const filters = $("scProFilters");
-  const unreadBadge = $("scUnreadBadge");
-  const onlinePill = $("scOnlinePill");
-  const network = $("scNetwork");
-  const newMsg = $("scNewMessage");
-  const cmdBackdrop = $("scCommandBackdrop");
-  const cmdInput = $("scCommandInput");
-  const cmdList = $("scCommandList");
-
-  const STATE_KEY = "shaanchat:pro-ui-v1";
-  let state = {filter:"all"};
-  let commands = [];
-  let selectedCommand = 0;
-
-  try {
-    state = {...state, ...JSON.parse(localStorage.getItem(STATE_KEY)||"{}")};
-  } catch {}
-
-  const save = () => {
-    try { localStorage.setItem(STATE_KEY, JSON.stringify(state)); } catch {}
-  };
-
-  function toast(text) {
-    if (typeof window.notify === "function") {
-      try { window.notify(text); return; } catch {}
-    }
-    let t=document.querySelector(".sc-v2-toast");
-    if(!t){
-      t=document.createElement("div"); t.className="sc-v2-toast";
-      document.body.appendChild(t);
-    }
-    t.textContent=text;
-    clearTimeout(t._timer);
-    t._timer=setTimeout(()=>t.remove(),2400);
-  }
-
-  function currentChatId(){
-    try {
-      if (typeof window.ShaanChatV2?.currentChat === "function") return window.ShaanChatV2.currentChat();
-    } catch {}
-    return document.querySelector(".user.active")?.dataset?.uid || null;
-  }
-
-  function isArchived(el){
-    return el.dataset.archived==="true" || el.classList.contains("sc-v2-muted") && el.dataset.archived==="true";
-  }
-
-  function isGroup(el){
-    const txt=(el.dataset.type||"").toLowerCase();
-    return txt==="group" || el.querySelector(".group-actions") || /group/i.test(el.dataset.name||"");
-  }
-
-  function isUnread(el){
-    return el.dataset.unread==="true" || !!el.querySelector(".sc-v2-badge");
-  }
-
-  function isFavourite(el){
-    return el.dataset.favourite==="true" || !!el.querySelector(".sc-v2-pin");
-  }
-
-  function applyFilter() {
-    if(!users) return;
-    const f=state.filter||"all";
-    let unread=0;
-    [...users.children].forEach(el=>{
-      if(!(el instanceof HTMLElement)) return;
-      const isSpecial = el.classList.contains("section-label") || el.classList.contains("people-hint");
-      if(isSpecial){ el.style.display=f==="all"?"":"none"; return; }
-
-      const show =
-        f==="all" ||
-        (f==="unread" && isUnread(el)) ||
-        (f==="favourites" && isFavourite(el)) ||
-        (f==="groups" && isGroup(el)) ||
-        (f==="archived" && isArchived(el));
-
-      el.style.display=show?"":"none";
-      if(isUnread(el)) unread++;
-    });
-
-    if(unreadBadge) unreadBadge.textContent=String(unread);
-    filters?.querySelectorAll("[data-filter]").forEach(b=>{
-      b.classList.toggle("active", b.dataset.filter===f);
-    });
-  }
-
-  filters?.addEventListener("click", e=>{
-    const b=e.target.closest("[data-filter]");
-    if(!b) return;
-    state.filter=b.dataset.filter; save(); applyFilter();
-  });
-
-  function refreshSoon(){
-    requestAnimationFrame(()=>requestAnimationFrame(applyFilter));
-  }
-
-  if(users){
-    new MutationObserver(refreshSoon).observe(users,{childList:true,subtree:true,attributes:true});
-    refreshSoon();
-  }
-
-  // Online/offline status is visible and actionable.
-  function networkState(){
-    const ok=navigator.onLine;
-    if(onlinePill){
-      onlinePill.textContent=ok?"● Online":"● Offline";
-      onlinePill.classList.toggle("offline",!ok);
-    }
-    if(network){
-      network.textContent=ok?"Back online":"No internet connection";
-      network.className="sc-network show "+(ok?"online":"offline");
-      clearTimeout(network._timer);
-      network._timer=setTimeout(()=>network.classList.remove("show"),2200);
-    }
-  }
-  window.addEventListener("online",networkState);
-  window.addEventListener("offline",networkState);
-
-  // Safe global error UX — never silently fail a button.
-  window.addEventListener("error", e=>{
-    console.error("ShaanChat error:",e.error||e.message);
-    if(navigator.onLine) toast("Something went wrong. Please try again.");
-  });
-  window.addEventListener("unhandledrejection", e=>{
-    console.error("ShaanChat promise error:",e.reason);
-    if(navigator.onLine) toast("Action failed. Please try again.");
-  });
-
-  function openCommandPalette(){
-    if(!cmdBackdrop) return;
-    cmdBackdrop.classList.remove("hidden");
-    cmdBackdrop.classList.add("show");
-    cmdInput.value="";
-    selectedCommand=0;
-    renderCommands("");
-    setTimeout(()=>cmdInput.focus(),40);
-  }
-  function closeCommandPalette(){
-    if(!cmdBackdrop)return;
-    cmdBackdrop.classList.remove("show");
-    cmdBackdrop.classList.add("hidden");
-  }
-
-  function buildCommands(){
-    commands=[
-      ["💬","Focus message box","Type a new message","M",()=>document.getElementById("messageInput")?.focus()],
-      ["🔎","Search messages","Search current conversation","S",()=>document.getElementById("searchMessagesBtn")?.click()],
-      ["⭐","Favourite chat","Toggle favourite","F",()=>window.ShaanChatV2?.pinChat?.()],
-      ["⋮","More chat options","Open advanced chat actions","",()=>window.ShaanChatV2?.openMoreChatOptions?.()],
-      ["⚙️","Settings","Open account settings","",()=>document.getElementById("settingsBtn")?.click()],
-      ["👤","Profile","Open profile editor","",()=>document.getElementById("profileBtn")?.click()],
-      ["👥","New group","Create a group chat","",()=>document.getElementById("groupBtn")?.click()],
-      ["▣","QR Center","Open QR center","",()=>document.getElementById("qrCenterBtn")?.click()],
-      ["🔐","Privacy & Security","Open security controls","",()=>document.getElementById("privacySecurityBtn")?.click()],
-      ["⌨️","Keyboard shortcuts","Show shortcuts","",()=>document.getElementById("scHelpModal")?.classList.remove("hidden")],
-      ["🚪","Logout","Sign out","",()=>document.getElementById("logoutBtn")?.click()]
-    ];
-  }
-
-  function renderCommands(term=""){
-    if(!cmdList) return;
-    buildCommands();
-    const q=term.trim().toLowerCase();
-    const found=commands.filter(c=>!q || (c[1]+" "+c[2]).toLowerCase().includes(q));
-    cmdList.innerHTML=found.length?found.map((c,i)=>`
-      <div class="sc-command-item ${i===selectedCommand?"selected":""}" data-command="${commands.indexOf(c)}">
-        <span class="ico">${c[0]}</span>
-        <span><strong>${escapeHtml(c[1])}</strong><small>${escapeHtml(c[2])}</small></span>
-        ${c[3]?`<span class="sc-command-kbd">${escapeHtml(c[3])}</span>`:""}
-      </div>`).join(""):`<div class="people-hint">No command found</div>`;
-  }
-
-  function escapeHtml(v){
-    return String(v).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
-  }
-
-  cmdInput?.addEventListener("input",()=>{selectedCommand=0;renderCommands(cmdInput.value)});
-  cmdList?.addEventListener("click",e=>{
-    const item=e.target.closest("[data-command]");
-    if(!item)return;
-    const idx=Number(item.dataset.command);
-    const cmd=commands[idx];
-    closeCommandPalette();
-    if(cmd?.[4])setTimeout(()=>{try{cmd[4]()}catch(err){console.error(err)}},30);
-  });
-  cmdBackdrop?.addEventListener("click",e=>{if(e.target===cmdBackdrop)closeCommandPalette()});
-
-  document.addEventListener("keydown",e=>{
-    const typing=/input|textarea|select/i.test(e.target?.tagName||"");
-    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){
-      e.preventDefault(); openCommandPalette(); return;
-    }
-    if(e.key==="Escape"){
-      if(cmdBackdrop?.classList.contains("show")){closeCommandPalette();return}
-      document.querySelectorAll(".modal:not(.hidden),.call-modal:not(.hidden),.media-viewer:not(.hidden)").forEach(x=>{
-        if(x.id==="appLockScreen")return;
-        x.classList.add("hidden");
-      });
-      return;
-    }
-    if(typing || e.ctrlKey || e.metaKey || e.altKey)return;
-    if(e.key==="ArrowDown" && cmdBackdrop?.classList.contains("show")){
-      e.preventDefault(); selectedCommand=Math.min(selectedCommand+1,commands.length-1); renderCommands(cmdInput.value);
-    }
-    if(e.key==="ArrowUp" && cmdBackdrop?.classList.contains("show")){
-      e.preventDefault(); selectedCommand=Math.max(selectedCommand-1,0); renderCommands(cmdInput.value);
-    }
-    if(e.key==="Enter" && cmdBackdrop?.classList.contains("show")){
-      const item=cmdList.querySelectorAll(".sc-command-item")[selectedCommand];
-      item?.click();
-    }
-  });
-
-  // Improve keyboard accessibility for clickable user rows.
-  if(users){
-    const observer=new MutationObserver(()=>{
-      users.querySelectorAll(".user:not([data-a11y])").forEach(el=>{
-        el.dataset.a11y="1";
-        if(!el.hasAttribute("tabindex"))el.tabIndex=0;
-        el.addEventListener("keydown",e=>{
-          if(e.key==="Enter"||e.key===" "){e.preventDefault();el.click();}
-        });
-      });
-    });
-    observer.observe(users,{childList:true,subtree:true});
-  }
-
-  // Message input: Enter sends, Shift+Enter creates a newline where possible.
-  const input=document.getElementById("messageInput");
-  input?.addEventListener("keydown",e=>{
-    if(e.key==="Enter" && !e.shiftKey){
-      e.preventDefault();
-      document.getElementById("sendBtn")?.click();
-    }
-  });
-
-  // Long-press on mobile user rows gives the existing More menu.
-  let pressTimer=null;
-  users?.addEventListener("pointerdown",e=>{
-    const row=e.target.closest(".user");
-    if(!row)return;
-    pressTimer=setTimeout(()=>{
-      try{window.ShaanChatV2?.openMoreChatOptions?.()}catch{}
-    },650);
-  });
-  ["pointerup","pointercancel","pointerleave"].forEach(ev=>users?.addEventListener(ev,()=>clearTimeout(pressTimer)));
-
-  // Make the new-message banner useful without inventing data.
-  newMsg?.addEventListener("click",()=>{
-    newMsg.classList.remove("show");
-    const active=document.querySelector(".user.active");
-    active?.scrollIntoView({behavior:"smooth",block:"center"});
-    document.getElementById("messages")?.scrollTo({top:document.getElementById("messages")?.scrollHeight||0,behavior:"smooth"});
-  });
-
-  // Remember last filter and expose a small public API for future feature work.
-  window.ShaanChatOneFile={
-    version:"2026.08-Pro",
-    openCommandPalette,
-    closeCommandPalette,
-    applyFilter,
-    setFilter(filter){state.filter=filter;save();applyFilter()},
-    showNewMessage(){newMsg?.classList.add("show")}
-  };
-
-  networkState();
-  refreshSoon();
-})();
 </script>
 
 </body>
